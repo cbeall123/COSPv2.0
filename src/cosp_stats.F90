@@ -296,7 +296,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                                  cfodd_ntotal,                         & !! inout
                                  wr_occfreq_ntotal,                    & !! inout
                                  lsmallcot, mice, lsmallreff,          & !! inout
-                                 lbigreff, nmultilcld, nhetcld, coldct,& !! inout
+                                 lbigreff, nmultilcld, nfracmulti,     & !! inout
+                                 nhetcld, coldct,                      & !! inout
                                  coldct_cal,calice, obs_ntotal, slwccot_ntotal )    !! inout
     integer,parameter :: &
          Nphase = 6 ! Number of CALIPSO cloud layer phase types
@@ -345,7 +346,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          lbigreff,          & ! # of liquid clouds that have too big reff to meet SLWC conditions
          coldct,            & ! # of subcolumns with cloud top temp < 273 K
          coldct_cal,        & ! # of subcolumns with cloud top temp < 273 K detected by CALIPSO (and not MODIS)
-         calice               ! # of columns where Calipso detected ice that was not detected by MODIS
+         calice,            & ! # of columns where Calipso detected ice that was not detected by MODIS
+         nfracmulti           ! # of subcolumns where fracout indicates multilayer cloud
     real(wp),dimension(Npoints,2),intent(inout) :: &
          nmultilcld,        & ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO/CloudSat detected
          nhetcld              ! # of heterogenous clouds (stratocumulus above/below cumulus) in continuous layer
@@ -355,17 +357,19 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
     ! Local variables
     integer  :: i, j, k
-    integer  :: ix, iy
+    integer  :: ix, iy, cs
     integer  :: kctop, kcbtm
     integer  :: icls
-    integer  :: iregime
+    integer  :: iregime 
     real     :: cmxdbz
     real(wp) :: diagcgt   !! diagnosed cloud geometric thickness [m]
     real(wp) :: diagdbze  !! diagnosed dBZe
     real(wp) :: diagicod  !! diagnosed in-cloud optical depth
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
+    real(wp), dimension(Ncolumns) :: slwccot_cls !! masking COT by class
+    real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls, scolcls !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
-    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice
+    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, icoldct, fracmulti
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
     integer  :: obstype   !! 1 = all-sky; 2 = clear-sky; 3 = cloudy-sky
     real(wp),dimension(Npoints,Ncolumns) :: slwccot     ! MODIS liquid COT for SLWCs only
@@ -394,6 +398,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           obs_ntotal(i,:) = R_UNDEF
           nhetcld(i,:) = R_UNDEF
           nmultilcld(i,:) = R_UNDEF
+          nfracmulti(i) = R_UNDEF
           coldct(i) = R_UNDEF
           coldct_cal(i) = R_UNDEF
 !          slwccot(i,:) = R_UNDEF
@@ -412,6 +417,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           obs_ntotal(i,:) = 0._wp
           nhetcld(i,:) = 0._wp
           nmultilcld(i,:) = 0._wp
+          nfracmulti(i) = 0._wp
           coldct(i) = 0._wp
           coldct_cal(i) = 0._wp
 !          slwccot(i,:) = 0._wp
@@ -470,6 +476,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           ocbtm = .true.  !! initialize
           kcbtm =     0   !! initialize
           kctop =     0   !! initialize
+          icoldct = .false. !! CMB
           !CDIR NOLOOPCHG
           do k = Nlevels, 1, -1  !! scan from cloud-bottom to cloud-top
              if ( dbze(i,j,k) .eq. R_GROUND .or. &
@@ -491,29 +498,35 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           if( ocbtm )  cycle  !! cloud wasn't detected in this subcolumn
           !! check SLWC?
           if( temp(i,1,kctop) .lt. tmelt ) then
-              coldct(i) = coldct(i) + 1._wp 
+              coldct(i) = coldct(i) + 1._wp
+              icoldct = .true.
           endif
-          if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
+          !if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
           oslwc = .true.
           hetcld = .false.
           multilcld = .false.
+          fracmulti = .false.
           cmxdbz = CFODD_DBZE_MIN  !! initialized
 
           !CDIR NOLOOPCHG
           do k = kcbtm, kctop, -1
              cmxdbz = max( cmxdbz, dbze(i,j,k) )  !! column maximum dBZe update
-             if ( fracout_int(i,j,k) .eq. SGCLD_CLR  .or.  &
-                & fracout_int(i,j,k) .eq. SGCLD_CUM  .or.  &
-                & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
+             !if ( fracout_int(i,j,k) .eq. SGCLD_CLR  .or.  &
+             !   & fracout_int(i,j,k) .eq. SGCLD_CUM  .or.  &
+             !   & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
+             !   oslwc = .false.
+             !endif
+             if (  dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
+                multilcld = .true.
                 oslwc = .false.
              endif
-             if ( fracout_int(i,j,k) .eq. SGCLD_CLR .or.   &
-                & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
-                multilcld = .true.
+             if ( fracout_int(i,j,k) .eq. SGCLD_CLR) then
+                fracmulti = .true.
              endif
              if ( fracout_int(i,j,k) .eq. SGCLD_CUM .and.  &
                 & .not. multilcld ) then
                 hetcld = .true.
+                oslwc = .false.
             endif
           enddo
           
@@ -524,19 +537,41 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           if ( hetcld ) then
              nhetcld(i,1) = nhetcld(i,1) + 1._wp
           endif
+
+          if (fracmulti) then
+             nfracmulti(i) = nfracmulti(i) + 1._wp
+          endif
           
           if ( .not. oslwc ) cycle  !! return to the j (subcolumn) loop
 
           !! warm-rain occurrence frequency
           iregime = 0
-          if( cmxdbz .lt. CFODD_BNDZE(1) ) then
+          !if( cmxdbz .lt. CFODD_BNDZE(1) ) then
+          if ( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct .and. .not. fracmulti ) then
              iregime = 1  !! non-precipitating
-          elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) ) then
+          elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) .and. .not. & 
+                  icoldct .and. .not. fracmulti) then
              iregime = 2  !! drizzling
-          elseif( cmxdbz .ge. CFODD_BNDZE(2) ) then
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct .and. .not. fracmulti ) then
              iregime = 3  !! raining
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct .and. .not. fracmulti ) then       
+             iregime = 4   !! non-precip and cold cloud top temp
+          elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) .and. & 
+                  icoldct .and. .not. fracmulti) then
+             iregime = 5  !! drizzling and cold cloud top temp
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct .and. .not. fracmulti ) then
+             iregime = 6  !! raining and cold cloud top temp
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct .and. fracmulti ) then       
+             iregime = 7   !! non-precip and cold cloud top temp, multilayer
+          elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) .and. & 
+                  icoldct .and. fracmulti) then
+             iregime = 8  !! drizzling and cold cloud top temp, multilayer
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct .and. fracmulti ) then
+             iregime = 9  !! raining and cold cloud top temp, multilayer
           endif
+
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+          
 
           !! retrievals of ICOD and dBZe bin for CFODD plane
           diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
@@ -552,16 +587,66 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              icod(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
           enddo
 
+                 !! retrieve the CFODD array based on Reff
+          icls = 0
+          if (    liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               .not. icoldct .and. .not. fracmulti ) then
+             icls = 1
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+               .not. icoldct .and. .not. fracmulti ) then
+             icls = 2
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+               .not. icoldct .and. .not. fracmulti ) then
+             icls = 3
+          elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               icoldct .and. .not. fracmulti ) then
+             icls = 4  ! small Reff size bin, cold cloud top temp
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                 icoldct .and. .not. fracmulti ) then
+             icls = 5  ! medium Reff size bin, cold cloud top temp
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+                  icoldct .and. .not. fracmulti ) then
+             icls = 6  ! large Reff size bin, cold cloud top temp
+          elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               icoldct .and. fracmulti ) then
+             icls = 7  ! small Reff size bin, cold cloud top temp, multilayer
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                 icoldct .and. fracmulti ) then
+             icls = 8  ! medium Reff size bin, cold cloud top temp, multilayer
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+                  icoldct .and. fracmulti ) then
+             icls = 9  ! large Reff size bin, cold cloud top temp, multilayer
+          endif
+          
+	  scolcls(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
+          
        enddo  ! j (Ncolumns)
 
        !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
-       call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod(i,1:Ncolumns,1:Nlevels), &
-                  & Ncolumns*Nlevels,                                           &
-                  & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,   &
-                  & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, icls )       )
+        !  do cs = 1,9,1
+        !     !! initialize
+        !     dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
+        !     icod_cls = icod(i,1:Ncolumns,1:Nlevels)
+        ! !    slwccot_cls = slwccot(i,1:Ncolumns)	  
+
+        !     ! mask out subcolumns not in this class
+        !     where (scolcls(1:Ncolumns,1:Nlevels) .ne. cs) 
+        !     	dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+        !   	icod_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+        !     end where
+
+        !    where (scolcls(1:Ncolumns,1) .ne. cs)
+        !    	slwccot_cls(1:Ncolumns) = R_UNDEF
+        !    end where
+
+        !   ! call hist2d( dbze_cls(1:Ncolumns,1:Nlevels), icod_cls(1:Ncolumns,1:Nlevels), &
+        !   !             & Ncolumns*Nlevels,                                              &
+        !   !             & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,      &
+        !   !             & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, cs )       )
     
-       slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                     &
-                     slwccot(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
+        !   !slwccot_ntotal(i, 1:SLWC_NCOT, cs) = hist1d( Ncolumns, slwccot_cls(1:Ncolumns),&
+        !   !                SLWC_NCOT, SLWC_HISTCOT    ) 
+        ! enddo
 
     enddo     ! i (Npoints)
 
@@ -669,11 +754,11 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! warm-rain occurrence frequency
           iregime = 0
           if( cmxdbz .lt. CFODD_BNDZE(1) ) then
-             iregime = 4  !! non-precipitating
+             iregime = 10  !! non-precipitating
           elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) ) then
-             iregime = 5  !! drizzling
+             iregime = 11  !! drizzling
           elseif( cmxdbz .ge. CFODD_BNDZE(2) ) then
-             iregime = 6  !! raining
+             iregime = 12  !! raining
           endif
 
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
@@ -695,7 +780,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
        enddo  ! j (Ncolumns)
        
-       icls = 4  !A 4th CFODD for all Reff bins
+       icls = 10  !A 4th CFODD for all Reff bins
        !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
        call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod_cal(i,1:Ncolumns,1:Nlevels), &
                   & Ncolumns*Nlevels,                                           &
