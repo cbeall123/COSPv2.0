@@ -296,7 +296,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                                  cfodd_ntotal,                         & !! inout
                                  wr_occfreq_ntotal,                    & !! inout
                                  lsmallcot, mice, lsmallreff,          & !! inout
-                                 lbigreff, nmultilcld, nhetcld, coldct,& !! inout
+                                 lbigreff, nmultilcld, nfracmulti,     & !! inout
+                                 nhetcld, coldct,                      & !! inout
                                  coldct_cal,calice, obs_ntotal, slwccot_ntotal )    !! inout
     integer,parameter :: &
          Nphase = 6 ! Number of CALIPSO cloud layer phase types
@@ -345,7 +346,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          lbigreff,          & ! # of liquid clouds that have too big reff to meet SLWC conditions
          coldct,            & ! # of subcolumns with cloud top temp < 273 K
          coldct_cal,        & ! # of subcolumns with cloud top temp < 273 K detected by CALIPSO (and not MODIS)
-         calice               ! # of columns where Calipso detected ice that was not detected by MODIS
+         calice,            &  ! # of columns where Calipso detected ice that was not detected by MODIS
+         nfracmulti            ! # of subcolumns where fracout indicates multilayer cloud
     real(wp),dimension(Npoints,2),intent(inout) :: &
          nmultilcld,        & ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO/CloudSat detected
          nhetcld              ! # of heterogenous clouds (stratocumulus above/below cumulus) in continuous layer
@@ -365,7 +367,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp) :: diagicod  !! diagnosed in-cloud optical depth
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
-    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice
+    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
     integer  :: obstype   !! 1 = all-sky; 2 = clear-sky; 3 = cloudy-sky
     real(wp),dimension(Npoints,Ncolumns) :: slwccot     ! MODIS liquid COT for SLWCs only
@@ -394,6 +396,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           obs_ntotal(i,:) = R_UNDEF
           nhetcld(i,:) = R_UNDEF
           nmultilcld(i,:) = R_UNDEF
+          nfracmulti(i) = R_UNDEF
           coldct(i) = R_UNDEF
           coldct_cal(i) = R_UNDEF
 !          slwccot(i,:) = R_UNDEF
@@ -412,6 +415,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           obs_ntotal(i,:) = 0._wp
           nhetcld(i,:) = 0._wp
           nmultilcld(i,:) = 0._wp
+          nfracmulti(i) = 0._wp
           coldct(i) = 0._wp
           coldct_cal(i) = 0._wp
 !          slwccot(i,:) = 0._wp
@@ -497,6 +501,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           oslwc = .true.
           hetcld = .false.
           multilcld = .false.
+          fracmulti = .false.
           cmxdbz = CFODD_DBZE_MIN  !! initialized
 
           !CDIR NOLOOPCHG
@@ -515,6 +520,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                 & .not. multilcld ) then
                 hetcld = .true.
             endif
+            if ( fracout_int(i,j,k) .eq. SGCLD_CLR) then
+                fracmulti = .true.
+            endif
           enddo
           
           if ( multilcld ) then
@@ -523,6 +531,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           
           if ( hetcld ) then
              nhetcld(i,1) = nhetcld(i,1) + 1._wp
+          endif
+          
+          if (fracmulti) then
+             nfracmulti(i) = nfracmulti(i) + 1._wp
           endif
           
           if ( .not. oslwc ) cycle  !! return to the j (subcolumn) loop
