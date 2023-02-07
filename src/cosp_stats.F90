@@ -367,7 +367,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp) :: diagicod  !! diagnosed in-cloud optical depth
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
-    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti
+    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
     integer  :: obstype   !! 1 = all-sky; 2 = clear-sky; 3 = cloudy-sky
     real(wp),dimension(Npoints,Ncolumns) :: slwccot     ! MODIS liquid COT for SLWCs only
@@ -474,6 +474,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           ocbtm = .true.  !! initialize
           kcbtm =     0   !! initialize
           kctop =     0   !! initialize
+          icoldct = .false. !! CMB
           !CDIR NOLOOPCHG
           do k = Nlevels, 1, -1  !! scan from cloud-bottom to cloud-top
              if ( dbze(i,j,k) .eq. R_GROUND .or. &
@@ -496,8 +497,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! check SLWC?
           if( temp(i,1,kctop) .lt. tmelt ) then
               coldct(i) = coldct(i) + 1._wp 
+              icoldct = .true.
           endif
-          if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
+          !if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
           oslwc = .true.
           hetcld = .false.
           multilcld = .false.
@@ -541,12 +543,20 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
           !! warm-rain occurrence frequency
           iregime = 0
-          if( cmxdbz .lt. CFODD_BNDZE(1) ) then
+          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct) then
              iregime = 1  !! non-precipitating
-          elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) ) then
+          elseif( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
+                  .and. .not. icoldct ) then
              iregime = 2  !! drizzling
-          elseif( cmxdbz .ge. CFODD_BNDZE(2) ) then
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then
              iregime = 3  !! raining
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct) then
+             iregime = 4  !! cold cloud top, non-precip
+          elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
+                  .and. icoldct ) then
+             iregime = 5  !! cold cloud top, drizzling
+          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct ) then
+              iregime = 6 !! cold cloud top, raining
           endif
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
 
@@ -681,11 +691,11 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! warm-rain occurrence frequency
           iregime = 0
           if( cmxdbz .lt. CFODD_BNDZE(1) ) then
-             iregime = 4  !! non-precipitating
+             iregime = 7  !! non-precipitating
           elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) ) then
-             iregime = 5  !! drizzling
+             iregime = 8  !! drizzling
           elseif( cmxdbz .ge. CFODD_BNDZE(2) ) then
-             iregime = 6  !! raining
+             iregime = 9  !! raining
           endif
 
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
