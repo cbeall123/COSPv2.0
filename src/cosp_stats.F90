@@ -509,21 +509,24 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !CDIR NOLOOPCHG
           do k = kcbtm, kctop, -1
              cmxdbz = max( cmxdbz, dbze(i,j,k) )  !! column maximum dBZe update
-             if ( fracout_int(i,j,k) .eq. SGCLD_CLR  .or.  &
-                & fracout_int(i,j,k) .eq. SGCLD_CUM  .or.  &
-                & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
-                oslwc = .false.
-             endif
-             if ( fracout_int(i,j,k) .eq. SGCLD_CLR .or.   &
-                & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
-                multilcld = .true.
-             endif
+             !if ( fracout_int(i,j,k) .eq. SGCLD_CLR  .or.  &
+             !   & fracout_int(i,j,k) .eq. SGCLD_CUM  .or.  &
+             !   & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
+             !   oslwc = .false.
+             !endif
+
              if ( fracout_int(i,j,k) .eq. SGCLD_CUM .and.  &
                 & .not. multilcld ) then
                 hetcld = .true.
+                oslwc = .false.
             endif
             if ( fracout_int(i,j,k) .eq. SGCLD_CLR) then
                 fracmulti = .true.
+            endif
+            if ( dbze       (i,j,k) .lt. CFODD_DBZE_MIN .and. &
+                & .not. fracmulti ) then
+                multilcld = .true.
+                oslwc = .false.
             endif
           enddo
           
@@ -543,20 +546,31 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
           !! warm-rain occurrence frequency
           iregime = 0
-          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct) then
+          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct .and. &
+              & .not. fracmulti ) then
              iregime = 1  !! non-precipitating
           elseif( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                  .and. .not. icoldct ) then
+                  .and. .not. icoldct .and. .not. fracmulti ) then
              iregime = 2  !! drizzling
-          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct .and. &
+                 & .not. fracmulti ) then
              iregime = 3  !! raining
-          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct) then
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct .and. &
+                  & .not. fracmulti ) then
              iregime = 4  !! cold cloud top, non-precip
           elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                  .and. icoldct ) then
+                  & .and. icoldct .and. .not. fracmulti ) then
              iregime = 5  !! cold cloud top, drizzling
-          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct ) then
-              iregime = 6 !! cold cloud top, raining
+          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct .and. & 
+                  & .not. fracmulti ) then
+             iregime = 6 !! cold cloud top, raining
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. fracmulti ) then
+              iregime = 7
+          elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
+                   .and. fracmulti ) then
+              iregime = 8
+          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. fracmulti ) then
+              iregime = 9
           endif
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
 
@@ -691,11 +705,11 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! warm-rain occurrence frequency
           iregime = 0
           if( cmxdbz .lt. CFODD_BNDZE(1) ) then
-             iregime = 7  !! non-precipitating
+             iregime = 10  !! non-precipitating
           elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) ) then
-             iregime = 8  !! drizzling
+             iregime = 11  !! drizzling
           elseif( cmxdbz .ge. CFODD_BNDZE(2) ) then
-             iregime = 9  !! raining
+             iregime = 12  !! raining
           endif
 
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
