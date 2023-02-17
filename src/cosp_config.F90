@@ -319,7 +319,7 @@ MODULE MOD_COSP_CONFIG
     ! CLOUDSAT and MODIS joint product information (2018.11.22)
     ! ####################################################################################
     ! @ COSP_DIAG_WARMRAIN:
-    integer, parameter :: CFODD_NCLASS  =    4 ! # of classes for CFODD (classified by MODIS Reff + 1 unclassified)
+    integer, parameter :: CFODD_NCLASS  =    10 ! # of classes for CFODD (classified by MODIS Reff + 1 unclassified)
     integer, parameter :: WR_NREGIME    =    12 ! # of warm-rain regimes (1 non-precip/ 2 drizzling/ 3 raining - MODIS, 
                                                ! 10 non-precip/ 11 drizzling/ 12 raining - CALIPSO, not detected by MODISs
     integer, parameter :: SGCLD_CLR     =    0 ! sub-grid cloud ID (fracout): clear-sky
@@ -327,7 +327,7 @@ MODULE MOD_COSP_CONFIG
     integer, parameter :: SGCLD_CUM     =    2 ! sub-grid cloud ID (fracout): cumulus
     real(wp),parameter :: CWP_THRESHOLD = 0.00 ! cloud water path threshold
     real(wp),parameter :: COT_THRESHOLD = 0.30 ! cloud optical thickness threshold
-    real(wp),parameter,dimension(CFODD_NCLASS) :: &
+    real(wp),parameter,dimension(4) :: &
          CFODD_BNDRE = (/5.0e-6, 12.0e-6, 18.0e-6, 35.0e-6/) ! Reff bnds
     real(wp),parameter,dimension(2) :: &
          CFODD_BNDZE = (/-15.0, 0.0/)                        ! dBZe bnds (cloud/drizzle/precip)

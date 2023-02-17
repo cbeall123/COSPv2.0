@@ -357,7 +357,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
     ! Local variables
     integer  :: i, j, k
-    integer  :: ix, iy
+    integer  :: ix, iy, cs
     integer  :: kctop, kcbtm
     integer  :: icls
     integer  :: iregime
@@ -366,6 +366,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp) :: diagdbze  !! diagnosed dBZe
     real(wp) :: diagicod  !! diagnosed in-cloud optical depth
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
+    real(wp), dimension(Ncolumns) :: slwccot_cls !! masking COT by class
+    real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls, scolcls !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
     logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
@@ -587,17 +589,76 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              endif
              icod(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
           enddo
+          
+           !! retrieve the CFODD array based on Reff
+          icls = 0
+          if (    liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               .not. icoldct .and. .not. fracmulti ) then
+             icls = 1
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+               .not. icoldct .and. .not. fracmulti ) then
+             icls = 2
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+               .not. icoldct .and. .not. fracmulti ) then
+             icls = 3
+          elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               icoldct .and. .not. fracmulti ) then
+             icls = 4  ! small Reff size bin, cold cloud top temp
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                 icoldct .and. .not. fracmulti ) then
+             icls = 5  ! medium Reff size bin, cold cloud top temp
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+                  icoldct .and. .not. fracmulti ) then
+             icls = 6  ! large Reff size bin, cold cloud top temp
+          elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+                 & fracmulti ) then
+             icls = 7  ! small Reff size bin, multilayer
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                & fracmulti ) then
+             icls = 8  ! medium Reff size bin, cold cloud top temp, multilayer
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+                 & fracmulti ) then
+             icls = 9  ! large Reff size bin, cold cloud top temp, multilayer
+          endif
+          
+          scolcls(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
 
        enddo  ! j (Ncolumns)
 
+       do cs = 1,9,1
+          !! initialize
+          dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
+          icod_cls = icod(i,1:Ncolumns,1:Nlevels)
+          slwccot_cls = slwccot(i,1:Ncolumns)
+          
+          !! mask out subcolumns not in class i
+          where (scolcls(1:Ncolumns,1:Nlevels) .ne. cs)
+              dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+              icod_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+          end where
+          
+          where (scolcls(1:Ncolumns,1) .ne. cs)
+              slwccot_cls(1:Ncolumns) = R_UNDEF
+          end where
+          
+          call hist2d( dbze_cls(1:Ncolumns,1:Nlevels), icod_cls(1:Ncolumns,1:Nlevels), &
+                      & Ncolumns*Nlevels,                                          &
+                      & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,  &
+                      & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, cs )      )
+          
+          slwccot_ntotal(i, 1:SLWC_NCOT, cs) = hist1d( Ncolumns,                 &
+                     slwccot_cls(1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )       
+                      
+       enddo ! cs (classes)
+          
        !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
-       call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod(i,1:Ncolumns,1:Nlevels), &
-                  & Ncolumns*Nlevels,                                           &
-                  & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,   &
-                  & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, icls )       )
+!       call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod(i,1:Ncolumns,1:Nlevels), &
+!                  & Ncolumns*Nlevels,                                           &
+!                  & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,   &
+!                  & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, icls )       )
     
-       slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                     &
-                     slwccot(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
+!       slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                     &
+!                     slwccot(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
 
     enddo     ! i (Npoints)
 
@@ -731,7 +792,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
        enddo  ! j (Ncolumns)
        
-       icls = 4  !A 4th CFODD for all Reff bins
+       icls = 10  !A 10th CFODD for all Reff bins
        !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
        call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod_cal(i,1:Ncolumns,1:Nlevels), &
                   & Ncolumns*Nlevels,                                           &
