@@ -287,7 +287,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
   !               E-mail: michibata@riam.kyushu-u.ac.jp
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   SUBROUTINE COSP_DIAG_WARMRAIN( Npoints, Ncolumns, Nlevels,           & !! in
-                                 temp,    zlev, lchnk, sunlit,         & !! in
+                                 temp,    zlev,                        & !! in
+                                 lchnk, sunlit,                        & !! in
                                  lwp,     liqcot,   liqreff, liqcfrc,  & !! in
                                  iwp,     icecot,   icereff, icecfrc,  & !! in
                                  fracout, dbze,                        & !! in
@@ -316,14 +317,13 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          liqcot,           & ! MODIS liq. COT
          liqreff,          & ! MODIS liq. Reff [m]
          liqcfrc             ! MODIS liq. cloud fraction
-!         sunlit              ! cospgridIN%sunlit
     real(wp), dimension(Npoints), intent(in) :: &
          iwp,              & ! MODIS IWP [kg m-2]
          icecot,           & ! MODIS ice COT
          icereff,          & ! MODIS ice Reff [m]
          icecfrc             ! MODIS ice cloud fraction
     real(wp), dimension(Npoints,Nlevels), intent(in) :: &
-         zlev                ! altitude [m] for model level
+         zlev                ! altitude [m] for model level, above ground
     real(wp), dimension(Npoints,1,Nlevels),intent(in) :: &
          temp                ! temperature [K]
     real(wp), dimension(Npoints,Ncolumns,Nlevels),intent(in) :: &
@@ -378,6 +378,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
     fracout_int(:,:,:) = NINT( fracout(:,:,:) )  !! assign an integer subpixel ID (0=clear-sky; 1=St; 2=Cu)
     modis_cond(:) = .false.
+    
+    !print*,"zlev(1,Nlevels) = ", zlev(1,Nlevels)
+    !print*,"zlev(1,1) = ", zlev(1,1)
 
     !! initialize
     slwccot(:,:) = R_UNDEF
@@ -435,7 +438,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           obs_ntotal(i,1) = obs_ntotal(i,1) + 1._wp  ! all-sky (# of all samples)
           obstype = 2                      ! initial flag (2 = clear sky)
           !CDIR NOLOOPCHG
-          do k = 1, Nlevels
+          do k = 1, Nlevels - 2  !masking out through 960m above ground, groundclutter
              if ( dbze   (i,j,k) .ge. CFODD_DBZE_MIN .and. &
                 & dbze   (i,j,k) .le. CFODD_DBZE_MAX .and. &
                 & fracout(i,j,k) .ne. SGCLD_CLR            ) then
@@ -478,7 +481,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           kctop =     0   !! initialize
           icoldct = .false. !! CMB
           !CDIR NOLOOPCHG
-          do k = Nlevels, 1, -1  !! scan from cloud-bottom to cloud-top
+          do k = Nlevels-2, 1, -1  !! scan from cloud-bottom to cloud-top, masking out through 960m above ground
              if ( dbze(i,j,k) .eq. R_GROUND .or. &
                   dbze(i,j,k) .eq. R_UNDEF       ) cycle
              if ( ocbtm                              .and. &
