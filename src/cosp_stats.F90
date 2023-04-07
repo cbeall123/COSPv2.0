@@ -437,8 +437,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !CDIR NOLOOPCHG
           do k = 1, Nlevels
              if ( dbze   (i,j,k) .ge. CFODD_DBZE_MIN .and. &
-                & dbze   (i,j,k) .le. CFODD_DBZE_MAX .and. &
-                & fracout(i,j,k) .ne. SGCLD_CLR            ) then
+                & dbze   (i,j,k) .le. CFODD_DBZE_MAX ) then
+                !.and. &
+                !& fracout(i,j,k) .ne. SGCLD_CLR            ) then
                 obstype = 3  ! cloudy sky
              endif
           enddo !Nlevels
@@ -482,7 +483,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              if ( dbze(i,j,k) .eq. R_GROUND .or. &
                   dbze(i,j,k) .eq. R_UNDEF       ) cycle
              if ( ocbtm                              .and. &
-                & fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &
+                !& fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &
                 & dbze(i,j,k)        .ge. CFODD_DBZE_MIN   ) then
                 ocbtm = .false.  !! cloud bottom detected
                 kcbtm = k
@@ -490,7 +491,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              endif
              if (       octop                        .and. &  !! scan cloud-top
                 & .not. ocbtm                        .and. &  !! cloud-bottom already detected
-                & fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &  !! exclude clear sky
+                !& fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &  !! exclude clear sky
                 & dbze(i,j,k)        .ge. CFODD_DBZE_MIN   ) then
                 kctop = k  !! update
              endif
@@ -520,7 +521,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              if ( fracout_int(i,j,k) .eq. SGCLD_CUM .and.  &
                 & .not. multilcld ) then
                 hetcld = .true.
-                oslwc = .false.
+                !oslwc = .false.
             endif
             if ( fracout_int(i,j,k) .eq. SGCLD_CLR) then
                 fracmulti = .true.
@@ -548,14 +549,14 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
           !! warm-rain occurrence frequency
           iregime = 0
-          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct .and. &
-              & .not. fracmulti ) then
+          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct ) then !.and. &
+              !& .not. fracmulti ) then
              iregime = 1  !! non-precipitating
           elseif( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                  .and. .not. icoldct .and. .not. fracmulti ) then
+                  .and. .not. icoldct ) then !.and. .not. fracmulti ) then
              iregime = 2  !! drizzling
-          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct .and. &
-                 & .not. fracmulti ) then
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then!.and. &
+                 !& .not. fracmulti ) then
              iregime = 3  !! raining
           elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct .and. &
                   & .not. fracmulti ) then
@@ -593,13 +594,13 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
            !! retrieve the CFODD array based on Reff
           icls = 0
           if (    liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
-               .not. icoldct .and. .not. fracmulti ) then
+               .not. icoldct ) then !.and. .not. fracmulti ) then
              icls = 1
           elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
-               .not. icoldct .and. .not. fracmulti ) then
+               .not. icoldct ) then !.and. .not. fracmulti ) then
              icls = 2
           elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
-               .not. icoldct .and. .not. fracmulti ) then
+               .not. icoldct ) then ! .and. .not. fracmulti ) then
              icls = 3
           elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
                icoldct .and. .not. fracmulti ) then
