@@ -328,7 +328,7 @@ MODULE MOD_COSP_CONFIG
     real(wp),parameter :: CWP_THRESHOLD = 0.00 ! cloud water path threshold
     real(wp),parameter :: COT_THRESHOLD = 0.30 ! cloud optical thickness threshold
     real(wp),parameter,dimension(4) :: &
-         CFODD_BNDRE = (/5.0e-6, 12.0e-6, 18.0e-6, 35.0e-6/) ! Reff bnds
+         CFODD_BNDRE = (/5.0e-6, 12.0e-6, 18.0e-6, 30.0e-6/) ! Reff bnds
     real(wp),parameter,dimension(2) :: &
          CFODD_BNDZE = (/-15.0, 0.0/)                        ! dBZe bnds (cloud/drizzle/precip)
     real(wp),parameter :: CFODD_DBZE_MIN    =  -30.0 ! Minimum value of CFODD dBZe bin
