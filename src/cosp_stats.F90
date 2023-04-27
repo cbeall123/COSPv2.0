@@ -47,7 +47,7 @@ MODULE MOD_COSP_STATS
             CWP_THRESHOLD,    COT_THRESHOLD,    &
             CFODD_NDBZE,      CFODD_NICOD,      &
             CFODD_BNDRE,      CFODD_BNDZE,      &
-            CFODD_NCLASS,                       &
+            CFODD_NCLASS,     COT_NCLASS,       &
             CFODD_DBZE_MIN,   CFODD_DBZE_MAX,   &
             CFODD_ICOD_MIN,   CFODD_ICOD_MAX,   &
             CFODD_DBZE_WIDTH, CFODD_ICOD_WIDTH, &
@@ -293,13 +293,14 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                                  iwp,     icecot,   icereff, icecfrc,  & !! in
                                  fracout, dbze,                        & !! in
                                  tautot_liq, tautot_ice,               & !! in
-                                 lidarcldphase,                        & !! in
+                                 lidarcldflag,                         & !! in
                                  cfodd_ntotal,                         & !! inout
                                  wr_occfreq_ntotal,                    & !! inout
                                  lsmallcot, mice, lsmallreff,          & !! inout
                                  lbigreff, nmultilcld, nfracmulti,     & !! inout
                                  nhetcld, coldct,                      & !! inout
-                                 coldct_cal,calice, obs_ntotal, slwccot_ntotal )    !! inout
+                                 coldct_cal,calice, obs_ntotal,        & !! inout
+                                 slwccot_ntotal )    !! inout
     integer,parameter :: &
          Nphase = 6 ! Number of CALIPSO cloud layer phase types
                     ! [ice,liquid,undefined,false ice,false liquid,Percent of ice]
@@ -330,9 +331,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          fracout,          & ! SCOPS subcolumn retrieval
          dbze,             & ! Radar reflectivity [dBZe]
          tautot_liq,       & ! CALIPSO optical thickness liquid
-         tautot_ice          ! CALIPSO optical thickness ice
-    real(wp), dimension(Npoints,Nlevels,Nphase),intent(in) :: &
-         lidarcldphase       ! CALIPSO cloud fraction by phase [2=liquid]
+         tautot_ice,       & ! CALIPSO optical thickness ice
+         lidarcldflag        ! CALIPSO cloud flag 
+    !real(wp), dimension(Npoints,Nlevels,Nphase),intent(in) :: &
+    !     lidarcldphase       ! CALIPSO cloud fraction by phase [2=liquid]
 
     ! Outputs
     real(wp),dimension(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS),intent(inout) :: &
@@ -352,7 +354,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          nmultilcld,        & ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO/CloudSat detected
          nhetcld              ! # of heterogenous clouds (stratocumulus above/below cumulus) in continuous layer
      real(wp),dimension(Npoints,NOBSTYPE),intent(inout) :: obs_ntotal     ! # of Observations
-     real(wp),dimension(Npoints,SLWC_NCOT,CFODD_NCLASS),intent(inout) :: slwccot_ntotal     ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin
+     real(wp),dimension(Npoints,SLWC_NCOT,COT_NCLASS),intent(inout) :: slwccot_ntotal ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin
+     !real(wp),dimension(Npoints,SLWC_NCOT,3),intent(inout) :: slwccot_ntotal     ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin, MODIS/CALIPSO
 
 
     ! Local variables
@@ -407,6 +410,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 !          slwccot(i,:) = R_UNDEF
 !          slwccot_cal(i,:) = R_UNDEF
           slwccot_ntotal(i,:,:) = R_UNDEF
+          !slwccot_ntotal_cal(i,:,:) = R_UNDEF
           calice(i) = R_UNDEF
        else
           cfodd_ntotal(i,:,:,:)  = 0._wp
@@ -426,6 +430,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 !          slwccot(i,:) = 0._wp
 !          slwccot_cal(i,:) = 0._wp
           slwccot_ntotal(i,:,:) = 0._wp
+          !slwccot_ntotal_cal(i,:,:) = 
           calice(i) = 0._wp
        endif
     enddo
@@ -529,8 +534,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
             if ( fracout_int(i,j,k) .eq. SGCLD_CLR) then
                 fracmulti = .true.
             endif
-            if ( dbze       (i,j,k) .lt. CFODD_DBZE_MIN .and. &
-                & .not. fracmulti ) then
+            if ( dbze       (i,j,k) .lt. CFODD_DBZE_MIN ) then
                 multilcld = .true.
                 oslwc = .false.
             endif
@@ -561,14 +565,12 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then!.and. &
                  !& .not. fracmulti ) then
              iregime = 3  !! raining
-          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct .and. &
-                  & .not. fracmulti ) then
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct ) then
              iregime = 4  !! cold cloud top, non-precip
           elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                  & .and. icoldct .and. .not. fracmulti ) then
+                  & .and. icoldct ) then
              iregime = 5  !! cold cloud top, drizzling
-          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct .and. & 
-                  & .not. fracmulti ) then
+          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct ) then
              iregime = 6 !! cold cloud top, raining
           elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. fracmulti ) then
               iregime = 7
@@ -666,15 +668,16 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
     enddo     ! i (Npoints)
 
-    ! Detection of SLWCs using CALIPSO/Cloudsat, only those that were not detectected by MODIS.
-    ! In other words, if MODIS detected an SLWC anywhere in the column, this column will be excluded from 
-    ! the following CALIPSO/CloudSat analysis of SLWCs to avoid double-counting. The  subcolumn logic is
-    ! based on CloudSat dBZe, and is the same whether considering MODIS/CloudSat or CALIPSO/CloudSat
+    ! Detection of SLWCs using CALIPSO/MODIS, only those that were not detectected by CloudSat/MODIS.
+    ! In other words, if CloudSat/MODIS detected an SLWC anywhere in the column, this column will be excluded from 
+    ! the following CALIPSO/MODIS analysis of SLWCs to avoid double-counting. The  subcolumn logic is
+    ! based on a subcolumn CALIPSO cloud flag derived from the cospOUT%cal_lidarcldphase variable
+    ! NOTE: CFODD is not possible from this section because it is CALIPSO/MODIS only
   
     do i  = 1, Npoints
         modis_ice = .false.
-        if( sunlit(i) .le. 0 .or.  & ! remove non-sunlit columns for consistency with MODIS detection of SLWCs 
-            sum(wr_occfreq_ntotal(i,1:WR_NREGIME)) .ge. 1.0_wp ) cycle !.or. & !exclude columns where MODIS detected SLWCs already
+        if( sunlit(i) .le. 0 .or.  & ! remove non-sunlit columns for MODIS detection of SLWCs 
+            sum(wr_occfreq_ntotal(i,1:WR_NREGIME)) .ge. 1.0_wp ) cycle !.or. & !exclude columns where MODIS/CloudSat detected SLWCs already
            ! iwp(i)     .gt.  CWP_THRESHOLD  .or.  &       !! exclude columns with ice clouds detected by MODIS
            ! icecot(i)  .gt.  COT_THRESHOLD  .or.  &       !! exclude columns ice clouds detected by MODIS
            ! icereff(i) .gt.  CFODD_BNDRE(1)       ) cycle !! exclude coulmns with ice clouds detected by MODIS
@@ -684,6 +687,13 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
             icereff(i) .gt.  CFODD_BNDRE(1)       ) then  !! exclude coulmns with ice clouds detected by MODIS
             modis_ice = .true.                           
         endif
+        
+        if (modis_ice) cycle 
+        
+        if( liqcot(i)  .le.  COT_THRESHOLD  .or.  &
+            liqreff(i) .lt.  CFODD_BNDRE(1)  .or.  &
+            liqreff(i) .gt.  CFODD_BNDRE(4)       ) cycle !! exclude columns that do not meet MODIS COT and Reff criteria
+
 !        if( sum(lidarcldphase(i,1:Nlevels,1)) .gt. 0.0_wp )
 !           calice(i) = calice(i) + 1._wp
 !           cycle
@@ -698,30 +708,27 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           kcbtm =     0   !! initialize
           kctop =     0   !! initialize
           if ( MAXVAL(tautot_ice(i,j,1:Nlevels)) .gt. COT_THRESHOLD & 
-               .and. .not. modis_ice ) then !exclude if Calipso detected ice
+               .and. .not. modis_ice ) then !Calipso detected ice, not excluding for consistency with obs
              calice(i) = calice(i) + 1._wp
           endif
 
-          if ( MAXVAL(tautot_ice(i,j,1:Nlevels)) .gt. COT_THRESHOLD ) cycle !exclude if Calipso detected ice
+        !  if ( MAXVAL(tautot_ice(i,j,1:Nlevels)) .gt. COT_THRESHOLD ) cycle !exclude if Calipso detected ice
 
-          if ( MAXVAL(tautot_liq(i,j,1:Nlevels)) .le. COT_THRESHOLD ) cycle !exclude subcolumn if clearsky
+        !  if ( MAXVAL(tautot_liq(i,j,1:Nlevels)) .le. COT_THRESHOLD ) cycle !exclude subcolumn if clearsky
       
                 
           !CDIR NOLOOPCHG
           do k = Nlevels, 1, -1  !! scan from cloud-bottom to cloud-top
-             if ( dbze(i,j,k) .eq. R_GROUND .or. &
-                  dbze(i,j,k) .eq. R_UNDEF       ) cycle
+             if ( lidarcldflag(i,j,k) .eq. R_UNDEF ) cycle
              if ( ocbtm                              .and. &
-                & fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &
-                & dbze(i,j,k)        .ge. CFODD_DBZE_MIN   ) then
+                & lidarcldflag(i,j,k) .eq. 1._wp   ) then
                 ocbtm = .false.  !! cloud bottom detected
                 kcbtm = k
                 kctop = k
              endif
-             if (       octop                        .and. &  !! scan cloud-top
-                & .not. ocbtm                        .and. &  !! cloud-bottom already detected
-                & fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &  !! exclude clear sky
-                & dbze(i,j,k)        .ge. CFODD_DBZE_MIN   ) then
+             if (       octop    .and. &  !! scan cloud-top
+                 & .not. ocbtm   .and. &  !! cloud-bottom already detected
+                 & ( lidarcldflag(i,j,k) .eq. 1._wp ) ) then
                 kctop = k  !! update
              endif
           enddo  !! k loop         
@@ -734,26 +741,14 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
           if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
           oslwc = .true.
-          hetcld = .false.
           multilcld = .false.
-          cmxdbz = CFODD_DBZE_MIN  !! initialized
 
           !CDIR NOLOOPCHG
           do k = kcbtm, kctop, -1
-             cmxdbz = max( cmxdbz, dbze(i,j,k) )  !! column maximum dBZe update
-             if ( fracout_int(i,j,k) .eq. SGCLD_CLR  .or.  &
-                & fracout_int(i,j,k) .eq. SGCLD_CUM  .or.  &
-                & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
+             if ( lidarcldflag(i,j,k) .ne. 1._wp ) then
+                multilcld = .true.
                 oslwc = .false.
              endif
-             if ( fracout_int(i,j,k) .eq. SGCLD_CLR .or.   &
-                & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
-                multilcld = .true.
-             endif
-             if ( fracout_int(i,j,k) .eq. SGCLD_CUM .and.  &
-                & .not. multilcld ) then
-                hetcld = .true.
-            endif
           enddo
           
 !          if ( multilcld .and. modis_cond(i) ) then
@@ -761,50 +756,42 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              nmultilcld(i,2) = nmultilcld(i,2) + 1._wp
           endif
           
-          if ( hetcld ) then
-             nhetcld(i,2) = nhetcld(i,2) + 1._wp
-          endif
-          
           if ( .not. oslwc ) cycle  !! return to the j (subcolumn) loop
 
           !! warm-rain occurrence frequency
-          iregime = 0
-          if( cmxdbz .lt. CFODD_BNDZE(1) ) then
-             iregime = 10  !! non-precipitating
-          elseif( cmxdbz .ge. CFODD_BNDZE(1) .and. cmxdbz .lt. CFODD_BNDZE(2) ) then
-             iregime = 11  !! drizzling
-          elseif( cmxdbz .ge. CFODD_BNDZE(2) ) then
-             iregime = 12  !! raining
-          endif
-
+          iregime = 10
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
 
           !! retrievals of ICOD and dBZe bin for CFODD plane
           diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
           cbtmh   = zlev(i,kcbtm)
           !CDIR NOLOOPCHG
-          !print*,"is oslwc true before slwccot_cal assigned?: ", oslwc
           do k = kcbtm, kctop, -1
              if( k .eq. kcbtm ) then
                 diagicod = tautot_liq(i,j,k)
-                slwccot_cal(i,j) = min( tautot_liq(i,j,k), SLWC_COT_MAX )
+                !slwccot_cal(i,j) = min( tautot_liq(i,j,k), SLWC_COT_MAX )
+                slwccot_cal(i,j) = min (liqcot(i), SLWC_COT_MAX)
              else
-                diagicod = tautot_liq(i,j,k) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
+                !diagicod = tautot_liq(i,j,k) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
+                diagicod = liqcot(i) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
              endif
              icod_cal(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
           enddo
 
        enddo  ! j (Ncolumns)
        
-       icls = 10  !A 10th CFODD for all Reff bins
-       !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
-       call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod_cal(i,1:Ncolumns,1:Nlevels), &
-                  & Ncolumns*Nlevels,                                           &
-                  & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,   &
-                  & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, icls )       )
-    
-       slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                     &
-                     slwccot_cal(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
+       !! retrieve the COT array based on Reff
+       icls = 0
+       if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) ) then
+           icls = 10
+       elseif ( liqreff(i) .ge. CFODD_BNDRE(2)  .and.  liqreff(i) .lt. CFODD_BNDRE(3)  ) then
+           icls = 11
+       elseif ( liqreff(i) .ge. CFODD_BNDRE(3) ) then
+           icls = 12
+       endif
+       
+       slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                  &
+                      slwccot_cal(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
 
     enddo     ! i (Npoints)
 

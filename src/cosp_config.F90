@@ -319,9 +319,10 @@ MODULE MOD_COSP_CONFIG
     ! CLOUDSAT and MODIS joint product information (2018.11.22)
     ! ####################################################################################
     ! @ COSP_DIAG_WARMRAIN:
-    integer, parameter :: CFODD_NCLASS  =    10 ! # of classes for CFODD (classified by MODIS Reff + 1 unclassified)
-    integer, parameter :: WR_NREGIME    =    12 ! # of warm-rain regimes (1 non-precip/ 2 drizzling/ 3 raining - MODIS, 
-                                               ! 10 non-precip/ 11 drizzling/ 12 raining - CALIPSO, not detected by MODISs
+    integer, parameter :: CFODD_NCLASS  =    9 ! # of classes for CFODD (classified by MODIS Reff + 1 unclassified)
+    integer, parameter :: WR_NREGIME    =    10 ! # of warm-rain regimes (1 non-precip/ 2 drizzling/ 3 raining - MODIS, 
+                                                ! 10  - MODIS/CALIPSO, not detected by MODIS/CloudSat
+    integer, parameter :: COT_NCLASS    =    12 ! # of classes for SLWC COT (10-12 are MODIS/CALIPSO-detected)
     integer, parameter :: SGCLD_CLR     =    0 ! sub-grid cloud ID (fracout): clear-sky
     integer, parameter :: SGCLD_ST      =    1 ! sub-grid cloud ID (fracout): stratiform
     integer, parameter :: SGCLD_CUM     =    2 ! sub-grid cloud ID (fracout): cumulus
