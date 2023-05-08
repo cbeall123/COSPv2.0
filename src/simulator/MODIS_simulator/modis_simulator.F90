@@ -242,7 +242,7 @@ contains
        Cloud_Particle_Size_Water_Mean,    Cloud_Particle_Size_Ice_Mean,      Cloud_Top_Pressure_Total_Mean,  &
        Liquid_Water_Path_Mean,            Ice_Water_Path_Mean,                                               &    
        Optical_Thickness_vs_Cloud_Top_Pressure,Optical_Thickness_vs_ReffIce,Optical_Thickness_vs_ReffLiq,    & 
-       cloudMask )
+       modis_CloudMask )
     
     ! INPUTS
     integer,intent(in) :: &
@@ -280,14 +280,15 @@ contains
          Optical_Thickness_vs_ReffIce
     real(wp),intent(inout),dimension(nPoints,numMODISTauBins,numMODISReffLiqBins) :: &    
          Optical_Thickness_vs_ReffLiq
-    logical, dimension(nPoints,nSubCols) :: &
-        cloudMask
+    real(wp), dimension(nPoints,nSubCols) :: &
+        modis_CloudMask
 
     ! LOCAL VARIABLES
     real(wp), parameter :: &
          LWP_conversion = 2._wp/3._wp * 1000._wp ! MKS units  
     integer :: j
     logical, dimension(nPoints,nSubCols) :: &
+         cloudMask,      &
          waterCloudMask, &
          iceCloudMask,   &
          validRetrievalMask
@@ -422,6 +423,11 @@ contains
     where(Cloud_Fraction_High_Mean /= R_UNDEF)  Cloud_Fraction_High_Mean = Cloud_Fraction_High_Mean*100._wp
     where(Cloud_Fraction_Mid_Mean /= R_UNDEF)   Cloud_Fraction_Mid_Mean = Cloud_Fraction_Mid_Mean*100._wp
     where(Cloud_Fraction_Low_Mean /= R_UNDEF)   Cloud_Fraction_Low_Mean = Cloud_Fraction_Low_Mean*100._wp
+    
+    where(cloudMask) 
+        modis_CloudMask = 1._wp
+    elsewhere
+        modis_CloudMask = 0._wp
 
   end subroutine modis_column
 

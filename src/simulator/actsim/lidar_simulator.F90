@@ -275,7 +275,7 @@ contains
   subroutine lidar_column(npoints, ncol, nlevels, llm, max_bin, ntype, platform, pnorm, pmol,             &
        pplay, zlev, zlev_half, vgrid_z, ok_lidar_cfad, ncat, cfad2, lidarcld, cldlayer,  &
        ! Optional stuff below
-       tmp, pnorm_perp, surfelev,  lidarcldphase, lidarcldflag, lidarcldtype, cldtype, cldtypetemp, &
+       tmp, pnorm_perp, surfelev,  lidarcldphase, lidarcldflag, lidarcldflag_cs, lidarcldtype, cldtype, cldtypetemp, &
        cldtypemeanz, cldtypemeanzse, cldthinemis, cldlayerphase, lidarcldtmp)
 
     integer,parameter :: &
@@ -334,6 +334,8 @@ contains
          lidarcldphase ! 3D "lidar" phase cloud fraction
     real(wp), intent(out),dimension(npoints,ncol,Nlevels),optional :: &
          lidarcldflag  ! 3D lidar cloud flag
+    real(wp), intent(out),dimension(npoints,ncol),optional :: &
+         lidarcldflag_cs ! 2D lidar cloud flag
     real(wp),intent(out),dimension(npoints,llm,ntype+1),optional :: & 
          lidarcldtype ! 3D "lidar" OPAQ type fraction 
     real(wp),intent(out),dimension(npoints,40,5),optional :: &
@@ -418,6 +420,9 @@ contains
           ! Calipso opaque cloud diagnostics
           CALL COSP_OPAQ(npoints,ncol,llm,ntype,tmpFlip,x3d,S_att,S_cld,R_UNDEF,lidarcldtype, &
                cldtype,cldtypetemp,cldtypemeanz,cldtypemeanzse,cldthinemis,vgrid_z,surfelev)
+               
+          ! CMB Collapse 3D Lidar cloud flag
+          lidarcldflag_cs(:,:) = MAXVAL(lidarcldflag,DIM=3)
        endif
        if (latlid) then
           CALL COSP_CLDFRAC_NOPHASE(npoints,ncol,llm,ncat,x3d,pnormFlip,pplayFlip,  &
@@ -445,6 +450,9 @@ contains
           ! Calipso opaque cloud diagnostics
           CALL COSP_OPAQ(npoints,ncol,nlevels,ntype,tmp,x3d,S_att,S_cld,R_UNDEF,lidarcldtype, &
                cldtype,cldtypetemp,cldtypemeanz,cldtypemeanzse,cldthinemis,vgrid_z,surfelev)
+          
+          ! CMB Collapse 3D Lidar cloud flag
+          lidarcldflag_cs(:,:) = MAXVAL(lidarcldflag,DIM=3)
        endif
        if (latlid) then
           CALL COSP_CLDFRAC_NOPHASE(npoints,ncol,nlevels,ncat,x3d,pnorm,pplay,  &
