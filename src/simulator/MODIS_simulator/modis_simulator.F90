@@ -428,6 +428,7 @@ contains
         modis_CloudMask = 1._wp
     elsewhere
         modis_CloudMask = 0._wp
+    endwhere
 
   end subroutine modis_column
 
