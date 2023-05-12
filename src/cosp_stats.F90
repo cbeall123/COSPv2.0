@@ -370,14 +370,16 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp) :: diagicod  !! diagnosed in-cloud optical depth
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
     real(wp), dimension(Ncolumns) :: slwccot_cls !! masking COT by class
-    real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls, scolcls !! masking by class 
+    real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls
+    integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2 !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
-    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct
+    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct, ulmodis
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
     integer  :: obstype   !! 1 = all-sky; 2 = clear-sky; 3 = cloudy-sky
     real(wp),dimension(Npoints,Ncolumns) :: slwccot     ! MODIS liquid COT for SLWCs only
     real(wp),dimension(Npoints,Ncolumns) :: slwccot_cal ! CALIPSO liquid COT for SLWCs only
     logical, dimension(Npoints) :: modis_cond           ! MODIS column-level conditions for detecting SLWCs
+    logical,dimension(Npoints,Ncolumns) :: modiscs_multi,modiscs_coldct  ! flag for multilayer and supercooled liq clouds detected by MODIS/CloudSat
 
     fracout_int(:,:,:) = NINT( fracout(:,:,:) )  !! assign an integer subpixel ID (0=clear-sky; 1=St; 2=Cu)
     modis_cond(:) = .false.
@@ -390,6 +392,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     slwccot_cal(:,:) = R_UNDEF
     icod(:,:,:) = R_UNDEF
     icod_cal(:,:,:) = R_UNDEF
+    modiscs_multi(:,:) = .false.
+    modiscs_coldct(:,:) = .false.
     do i = 1, Npoints
 !       if ( lwp(i) .eq. R_UNDEF ) then  ! for non-sunlit columns
        if ( sunlit(i) .le. 0 ) then  ! for non-sunlit columns
@@ -508,6 +512,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! check SLWC?
           if( temp(i,1,kctop) .lt. tmelt ) then
               coldct(i) = coldct(i) + 1._wp 
+              modiscs_coldct(i,j) = .true.
               icoldct = .true.
           endif
           !if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
@@ -536,6 +541,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
             endif
             if ( dbze       (i,j,k) .lt. CFODD_DBZE_MIN ) then
                 multilcld = .true.
+                modiscs_multi(i,j) = .true.
                 oslwc = .false.
             endif
           enddo
@@ -598,6 +604,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           
            !! retrieve the CFODD array based on Reff
           icls = 0
+          scolcls(:,:) = 0
+          scolcls2(:,:) = 0 
+          
           if (    liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
                .not. icoldct ) then !.and. .not. fracmulti ) then
              icls = 1
@@ -607,31 +616,30 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
                .not. icoldct ) then ! .and. .not. fracmulti ) then
              icls = 3
-          elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
-               icoldct .and. .not. fracmulti ) then
-             icls = 4  ! small Reff size bin, cold cloud top temp
-          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
-                 icoldct .and. .not. fracmulti ) then
-             icls = 5  ! medium Reff size bin, cold cloud top temp
-          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
-                  icoldct .and. .not. fracmulti ) then
-             icls = 6  ! large Reff size bin, cold cloud top temp
-          elseif ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
-                 & fracmulti ) then
-             icls = 7  ! small Reff size bin, multilayer
-          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
-                & fracmulti ) then
-             icls = 8  ! medium Reff size bin, cold cloud top temp, multilayer
-          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
-                 & fracmulti ) then
-             icls = 9  ! large Reff size bin, cold cloud top temp, multilayer
           endif
           
           scolcls(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
+          
+          
+          ! Generating CFODD for only SLWCs with max reflectivity < 20 dBZ, cot < 20 for linear
+          ! regression, Suzuki et al. (2010)
+          if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) < 20._wp) then
+             icls = 4  ! small Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                 .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) < 20._wp) then
+             icls = 5  ! medium Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+                  .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) < 20._wp) then
+             icls = 6  ! large Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+          endif
+          
+          scolcls2(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
 
        enddo  ! j (Ncolumns)
-
-       do cs = 1,9,1
+       
+       ! Generate original CFODD
+       do cs = 1,3,1
           !! initialize
           dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
           icod_cls = icod(i,1:Ncolumns,1:Nlevels)
@@ -644,6 +652,33 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           end where
           
           where (scolcls(1:Ncolumns,1) .ne. cs)
+              slwccot_cls(1:Ncolumns) = R_UNDEF
+          end where
+          
+          call hist2d( dbze_cls(1:Ncolumns,1:Nlevels), icod_cls(1:Ncolumns,1:Nlevels), &
+                      & Ncolumns*Nlevels,                                          &
+                      & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,  &
+                      & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, cs )      )
+          
+          slwccot_ntotal(i, 1:SLWC_NCOT, cs) = hist1d( Ncolumns,                 &
+                     slwccot_cls(1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )       
+                      
+       enddo ! cs (classes)
+       
+       ! Generate additional CFODD for just SLWCs with cmxdbz < 20
+       do cs = 4,6,1
+          !! initialize
+          dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
+          icod_cls = icod(i,1:Ncolumns,1:Nlevels)
+          slwccot_cls = slwccot(i,1:Ncolumns)
+          
+          !! mask out subcolumns not in class i
+          where (scolcls2(1:Ncolumns,1:Nlevels) .ne. cs)
+              dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+              icod_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+          end where
+          
+          where (scolcls2(1:Ncolumns,1) .ne. cs)
               slwccot_cls(1:Ncolumns) = R_UNDEF
           end where
           
@@ -676,8 +711,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
   
     do i  = 1, Npoints
         modis_ice = .false.
+        ulmodis = .false.
         if( sunlit(i) .le. 0 .or.  & ! remove non-sunlit columns for MODIS detection of SLWCs 
-            sum(wr_occfreq_ntotal(i,1:WR_NREGIME)) .ge. 1.0_wp ) cycle !.or. & !exclude columns where MODIS/CloudSat detected SLWCs already
+            sum(wr_occfreq_ntotal(i,1:WR_NREGIME) ) .ge. 1.0_wp ) cycle !exclude columns where MODIS/CloudSat detected SLWCs already
            ! iwp(i)     .gt.  CWP_THRESHOLD  .or.  &       !! exclude columns with ice clouds detected by MODIS
            ! icecot(i)  .gt.  COT_THRESHOLD  .or.  &       !! exclude columns ice clouds detected by MODIS
            ! icereff(i) .gt.  CFODD_BNDRE(1)       ) cycle !! exclude coulmns with ice clouds detected by MODIS
@@ -688,18 +724,14 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
             modis_ice = .true.                           
         endif
         
-        if (modis_ice) cycle 
+        if ( modis_ice ) cycle 
         
         if( liqcot(i)  .le.  COT_THRESHOLD  .or.  &
-            liqreff(i) .lt.  CFODD_BNDRE(1)  .or.  &
-            liqreff(i) .gt.  CFODD_BNDRE(4)       ) cycle !! exclude columns that do not meet MODIS COT and Reff criteria
-
-!        if( sum(lidarcldphase(i,1:Nlevels,1)) .gt. 0.0_wp )
-!           calice(i) = calice(i) + 1._wp
-!           cycle
-!        endif
-
-!       if( sum(lidarcldphase(i,1:Nlevels,2)) .le. 0.0_wp ) cycle ! exclude clear-sky
+            lwp(i) .le. CWP_THRESHOLD       .or. &
+            liqreff(i) .lt.  CFODD_BNDRE(1) .or.  &
+            liqreff(i) .gt.  CFODD_BNDRE(4)      ) then
+            ulmodis = .true. !! if MODIS does not detect a cloud, check if CALIPSO detects
+        endif
 
        !CDIR NOLOOPCHG
        do j = 1, Ncolumns, 1
@@ -708,7 +740,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           kcbtm =     0   !! initialize
           kctop =     0   !! initialize
           if ( MAXVAL(tautot_ice(i,j,1:Nlevels)) .gt. COT_THRESHOLD & 
-               .and. .not. modis_ice ) then !Calipso detected ice, not excluding for consistency with obs
+               .and. .not. modis_ice ) then !Calipso detected ice, but not excluding for consistency with obs
              calice(i) = calice(i) + 1._wp
           endif
 
@@ -735,7 +767,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
           if( ocbtm )  cycle  !! cloud wasn't detected in this subcolumn
           !! check SLWC?
-          if( temp(i,1,kctop) .lt. tmelt ) then 
+          !! If cold cloud top and not detected already by MODIS/CloudSat, add to coldct_cal
+          !! Supercooled liquid cloud fraction requires phase detection, which is only available through
+          !! MODIS, so MODIS detection of cloud is required for the supercooled liquid frequency here
+          if( temp(i,1,kctop) .lt. tmelt .and. .not. modiscs_coldct(i,j) .and. .not. ulmodis) then 
               coldct_cal(i) = coldct_cal(i) + 1._wp 
           endif
 
@@ -750,49 +785,58 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                 oslwc = .false.
              endif
           enddo
-          
-!          if ( multilcld .and. modis_cond(i) ) then
-          if (multilcld) then
+
+          !If CALIPSO detected a multilayer cloud that MODIS/CloudSat did not, add to multilcld_cal
+          if (multilcld .and. (.not. modiscs_multi(i,j) ) ) then
              nmultilcld(i,2) = nmultilcld(i,2) + 1._wp
           endif
           
           if ( .not. oslwc ) cycle  !! return to the j (subcolumn) loop
 
           !! warm-rain occurrence frequency
-          iregime = 10
-          wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+          !! If MODIS/CALIPSO detected the SLWC, add to npdfslwc_mcal
+          !! and retrieve COT binned by cloud top Reff
+          if (.not. ulmodis) then 
+              iregime = 10
+              wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
 
-          !! retrievals of ICOD and dBZe bin for CFODD plane
-          diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
-          cbtmh   = zlev(i,kcbtm)
-          !CDIR NOLOOPCHG
-          do k = kcbtm, kctop, -1
-             if( k .eq. kcbtm ) then
-                diagicod = tautot_liq(i,j,k)
-                !slwccot_cal(i,j) = min( tautot_liq(i,j,k), SLWC_COT_MAX )
-                slwccot_cal(i,j) = min (liqcot(i), SLWC_COT_MAX)
-             else
-                !diagicod = tautot_liq(i,j,k) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
-                diagicod = liqcot(i) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
-             endif
-             icod_cal(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
-          enddo
+              !! retrievals of ICOD and dBZe bin for CFODD plane
+              diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
+              cbtmh   = zlev(i,kcbtm)
+              !CDIR NOLOOPCHG
+              do k = kcbtm, kctop, -1
+                 if( k .eq. kcbtm ) then
+                    diagicod = liqcot(i)
+                    slwccot_cal(i,j) = min (liqcot(i), SLWC_COT_MAX)
+                 else
+                    diagicod = liqcot(i) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
+                 endif
+                 icod_cal(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
+              enddo ! k (Nlevels)
+          
+          !If only CALIPSO detected the SLWC, add to npdfslwc_calonly
+          elseif (ulmodis) then
+              iregime = 11
+              wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+          endif
 
        enddo  ! j (Ncolumns)
        
-       !! retrieve the COT array based on Reff
+       !! retrieve the COT array based on Reff, if SLWCs detected by MODIS/CALIPSO
        icls = 0
-       if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) ) then
-           icls = 10
-       elseif ( liqreff(i) .ge. CFODD_BNDRE(2)  .and.  liqreff(i) .lt. CFODD_BNDRE(3)  ) then
-           icls = 11
-       elseif ( liqreff(i) .ge. CFODD_BNDRE(3) ) then
-           icls = 12
-       endif
+       if (.not. ulmodis) then
+           if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) ) then
+               icls = 10
+           elseif ( liqreff(i) .ge. CFODD_BNDRE(2)  .and.  liqreff(i) .lt. CFODD_BNDRE(3)  ) then
+               icls = 11
+           elseif ( liqreff(i) .ge. CFODD_BNDRE(3) ) then
+               icls = 12
+           endif
        
        slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                  &
                       slwccot_cal(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
-
+      endif   
+    
     enddo     ! i (Npoints)
 
         
