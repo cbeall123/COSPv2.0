@@ -508,6 +508,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                 kctop = k  !! update
              endif
           enddo  !! k loop
+
           if( ocbtm )  cycle  !! cloud wasn't detected in this subcolumn
           !! check SLWC?
           if( temp(i,1,kctop) .lt. tmelt ) then
@@ -596,11 +597,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              if( k .eq. kcbtm ) then
                 diagicod = liqcot(i)
                 slwccot(i,j) = min( liqcot(i), SLWC_COT_MAX )
-             else
-                diagicod = liqcot(i) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
-             endif
-             icod(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
-          enddo
           
            !! retrieve the CFODD array based on Reff
           icls = 0
@@ -879,6 +875,19 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
               
     enddo !i (Npoints)
 
+=======
+
+       enddo  ! j (Ncolumns)
+
+       !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
+       call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod(i,1:Ncolumns,1:Nlevels), &
+                  & Ncolumns*Nlevels,                                           &
+                  & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,   &
+                  & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, icls )       )
+
+    enddo     ! i (Npoints)
+
+>>>>>>> origin/master
   RETURN
   END SUBROUTINE COSP_DIAG_WARMRAIN
 

@@ -304,7 +304,6 @@ MODULE MOD_COSP
           mice => null(),            & ! # of ice clouds (Npoints)
           lsmallreff => null(),      & ! # of liquid clouds with Reff below lower threshold (Npoints)
           lbigreff => null()           ! # of liquid clouds with Reff above upper threshold (Npoints)     
-          
   end type cosp_outputs
 
 CONTAINS
@@ -401,8 +400,6 @@ CONTAINS
          mice(:),                & ! # of ice clouds (Npoints)
          lsmallreff(:),          & ! # of liquid clouds with Reff below lower threshold (Npoints)
          lbigreff(:)               ! # of liquid clouds with Reff above upper threshold (Npoints)
-         
-
     ! Initialize error reporting for output
     cosp_simulator(:)=''
 
@@ -618,9 +615,8 @@ CONTAINS
        Lcloudsat_column    = .true.
        Lcloudsat_subcolumn = .true.
        Lcloudsat_modis_wr  = .true. ! WR: warm rain product
-       !print*, "Lcloudsat_modis_wr is TRUE"
     endif
-    
+
     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     ! 2b) Error Checking
     !     Enforce bounds on input fields. If input field is out-of-bounds, report error
@@ -747,7 +743,7 @@ CONTAINS
        rttovIN%n2o        => cospgridIN%n2o
        rttovIN%co         => cospgridIN%co
        rttovIN%surfem     => cospgridIN%emis_sfc
-       rttovIN%h_surf     => cospgridIN%hgt_matrix_half(:,cospIN%Nlevels+1)
+       rttovIN%h_surf     => cospgridIN%hgt_matrix_half(:,cospIN%Nlevels)
        rttovIN%u_surf     => cospgridIN%u_sfc
        rttovIN%v_surf     => cospgridIN%v_sfc
        rttovIN%t_skin     => cospgridIN%skt
@@ -1613,13 +1609,13 @@ CONTAINS
 
     ! CloudSat/MODIS joint products (CFODDs and Occurrence Frequency of Warm Clouds)
     if (Lcloudsat_modis_wr) then
-       !print*,"running warm rain diagnostics from cosp_simulator"
        allocate( cfodd_ntotal(cloudsatIN%Npoints, CFODD_NDBZE, CFODD_NICOD, CFODD_NCLASS) )
        allocate( wr_occfreq_ntotal(cloudsatIN%Npoints, WR_NREGIME) )
        allocate( lsmallcot(cloudsatIN%Npoints) )
        allocate( mice(cloudsatIN%Npoints) )
        allocate( lsmallreff(cloudsatIN%Npoints) )
        allocate( lbigreff(cloudsatIN%Npoints) )
+
        if ( use_vgrid ) then
           !! interporation for fixed vertical grid:
           allocate( zlev(cloudsatIN%Npoints,Nlvgrid),                         &
@@ -1652,8 +1648,6 @@ CONTAINS
                cospIN%frac_out(:,:,cloudsatIN%Nlevels:1:-1), Nlvgrid,         &
                vgrid_zl(Nlvgrid:1:-1), vgrid_zu(Nlvgrid:1:-1),                &
                frac_outI(:,:,Nlvgrid:1:-1)                                    )
-          !print*, "frac_out: ",frac_outI(1,1,3)
-          where(
           call cosp_diag_warmrain(                                            &
                cloudsatIN%Npoints, cloudsatIN%Ncolumns, Nlvgrid,              & !! in
                tempI, zlev,                                                   & !! in
@@ -1687,6 +1681,7 @@ CONTAINS
                cloudsatDBZe,                                                  & !! in
                cfodd_ntotal, wr_occfreq_ntotal,                               & !! inout
                lsmallcot, mice, lsmallreff, lbigreff                          ) !! inout
+               cfodd_ntotal, wr_occfreq_ntotal                                ) !! inout
        endif  !! use_vgrid or not
 
        ! Store, when necessary
@@ -1777,7 +1772,6 @@ CONTAINS
     if (allocated(mice))                  deallocate(mice)
     if (allocated(lsmallreff))            deallocate(lsmallreff)
     if (allocated(lbigreff))              deallocate(lbigreff)
-
   end function COSP_SIMULATOR
   ! ######################################################################################
   ! SUBROUTINE cosp_init
@@ -1842,6 +1836,10 @@ CONTAINS
     else
        Nlvgrid = Nlevels
        allocate(vgrid_zl(Nlvgrid),vgrid_zu(Nlvgrid),vgrid_z(Nlvgrid),dz(Nlvgrid))
+       vgrid_zl = 0._wp
+       vgrid_zu = 0._wp
+       vgrid_z  = 0._wp
+       dz       = 0._wp
     endif
 
     ! Initialize simulators
@@ -3885,7 +3883,7 @@ CONTAINS
        if (size(cospgridIN%pfull,2)           .ne. cospIN%Nlevels   .OR. &
            size(cospgridIN%at,2)              .ne. cospIN%Nlevels   .OR. &
            size(cospgridIN%qv,2)              .ne. cospIN%Nlevels   .OR. &
-           size(cospgridIN%hgt_matrix_half,2) .ne. cospIN%Nlevels+1 .OR. &
+           size(cospgridIN%hgt_matrix_half,2) .ne. cospIN%Nlevels   .OR. &
            size(cospgridIN%phalf,2)           .ne. cospIN%Nlevels+1 .OR. &
            size(cospgridIN%qv,2)              .ne. cospIN%Nlevels) then
           Lrttov_column    = .false.
