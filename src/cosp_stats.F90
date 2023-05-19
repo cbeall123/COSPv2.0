@@ -371,7 +371,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
     real(wp), dimension(Ncolumns) :: slwccot_cls !! masking COT by class
     real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls
-    integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2 !! masking by class 
+    integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2,scolcls3 !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
     logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct, ulmodis
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
@@ -607,6 +607,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           icls = 0
           scolcls(:,:) = 0
           scolcls2(:,:) = 0 
+          scolcls3(:,:) = 0 
           
           if (    liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
                .not. icoldct ) then !.and. .not. fracmulti ) then
@@ -621,7 +622,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           
           scolcls(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
           
-          
+          icls = 0
           ! Generating CFODD for only SLWCs with max reflectivity < 20 dBZ, cot < 20 for linear
           ! regression, Suzuki et al. (2010)
           if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
@@ -636,6 +637,25 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           endif
           
           scolcls2(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
+          
+          icls = 0
+          ! Generating CFODD for only SLWCs with max reflectivity < 20 dBZ, 4 <= cot < 20 for linear
+          ! regression, Suzuki et al. (2010)
+          if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+               .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp &
+               .and. liqcot(i) < 20._wp ) then
+             icls = 7  ! small Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+          elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                 .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp  &
+                 .and. liqcot(i) < 20._wp) then
+             icls = 8  ! medium Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+          elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
+                  .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp &
+                  .and. liqcot(i) < 20._wp) then
+             icls = 9  ! large Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+          endif
+          
+          scolcls3(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
 
        enddo  ! j (Ncolumns)
        
@@ -680,6 +700,33 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           end where
           
           where (scolcls2(1:Ncolumns,1) .ne. cs)
+              slwccot_cls(1:Ncolumns) = R_UNDEF
+          end where
+          
+          call hist2d( dbze_cls(1:Ncolumns,1:Nlevels), icod_cls(1:Ncolumns,1:Nlevels), &
+                      & Ncolumns*Nlevels,                                          &
+                      & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,  &
+                      & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, cs )      )
+          
+          slwccot_ntotal(i, 1:SLWC_NCOT, cs) = hist1d( Ncolumns,                 &
+                     slwccot_cls(1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )       
+                      
+       enddo ! cs (classes)
+       
+       ! Generate additional CFODD for just SLWCs with cmxdbz < 20 and 4 <= COT < 20
+       do cs = 7,9,1
+          !! initialize
+          dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
+          icod_cls = icod(i,1:Ncolumns,1:Nlevels)
+          slwccot_cls = slwccot(i,1:Ncolumns)
+          
+          !! mask out subcolumns not in class i
+          where (scolcls3(1:Ncolumns,1:Nlevels) .ne. cs)
+              dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+              icod_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+          end where
+          
+          where (scolcls3(1:Ncolumns,1) .ne. cs)
               slwccot_cls(1:Ncolumns) = R_UNDEF
           end where
           
