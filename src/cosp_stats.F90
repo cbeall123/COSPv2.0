@@ -572,20 +572,27 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then!.and. &
                  !& .not. fracmulti ) then
              iregime = 3  !! raining
-          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct ) then
+          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct .and. &
+                   liqcot(i) .ge. 20._wp  ) then
              iregime = 4  !! cold cloud top, non-precip
           elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                  & .and. icoldct ) then
-             iregime = 5  !! cold cloud top, drizzling
-          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. icoldct ) then
-             iregime = 6 !! cold cloud top, raining
-          elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. fracmulti ) then
-              iregime = 7
-          elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                   .and. fracmulti ) then
-              iregime = 8
-          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. fracmulti ) then
-              iregime = 9
+                  & .and. .not. icoldct .and. liqcot(i) .ge. 20._wp  ) then
+             iregime = 5  !! big COT, drizzling
+          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct .and. &
+                   liqcot(i) .ge. 20._wp ) then
+             iregime = 6 !! big COT, raining
+          elseif (   cmxdbz .lt. CFODD_BNDZE(1) .and. &
+               .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp &
+               .and. liqcot(i) < 20._wp  ) then
+              iregime = 7 !! non-precipitating, Suzuki et al. (2010) linear regression
+          elseif ( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) .and. &
+                 .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp  &
+                 .and. liqcot(i) < 20._wp ) then
+              iregime = 8 !! drizzling, Suzuki et al. (2010) linear regression
+          elseif ( cmxdbz .ge. CFODD_BNDZE(2) .and. cmxdbz .lt. CFODD_DBZE_MAX .and. &
+                  .not. icoldct .and. liqcot(i) .ge. 4._wp &
+                  .and. liqcot(i) < 20._wp ) then
+              iregime = 9 !! raining, Suzuki et al. (2010) linear regression
           endif
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
 
@@ -623,17 +630,16 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           scolcls(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
           
           icls = 0
-          ! Generating CFODD for only SLWCs with max reflectivity < 20 dBZ, cot < 20 for linear
-          ! regression, Suzuki et al. (2010)
+          ! Generating CFODD for only SLWCs with cot > 20
           if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
-               .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) < 20._wp) then
-             icls = 4  ! small Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+               .not. icoldct .and. liqcot(i) .ge. 20._wp) then
+             icls = 4  ! small Reff size bin, only SLWCs with cot > 20
           elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
-                 .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) < 20._wp) then
-             icls = 5  ! medium Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+                 .not. icoldct  .and. liqcot(i) .ge. 20._wp) then
+             icls = 5  ! medium Reff size bin, only SLWCs with cot > 20
           elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
-                  .not. icoldct .and. cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) < 20._wp) then
-             icls = 6  ! large Reff size bin, only SLWCs with max reflectivity < 20 dBZ, cot < 20
+                  .not. icoldct  .and. liqcot(i) .ge. 20._wp) then
+             icls = 6  ! large Reff size bin, only SLWCs with  cot > 20
           endif
           
           scolcls2(j,1:Nlevels) = icls   ! save class assignment for each subcolumn for histogram
