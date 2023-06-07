@@ -242,7 +242,7 @@ contains
        Cloud_Particle_Size_Water_Mean,    Cloud_Particle_Size_Ice_Mean,      Cloud_Top_Pressure_Total_Mean,  &
        Liquid_Water_Path_Mean,            Ice_Water_Path_Mean,                                               &    
        Optical_Thickness_vs_Cloud_Top_Pressure,Optical_Thickness_vs_ReffIce,Optical_Thickness_vs_ReffLiq,    & 
-       modis_CloudMask )
+       modis_CloudMask, modis_iceCloudMask )
     
     ! INPUTS
     integer,intent(in) :: &
@@ -281,7 +281,7 @@ contains
     real(wp),intent(inout),dimension(nPoints,numMODISTauBins,numMODISReffLiqBins) :: &    
          Optical_Thickness_vs_ReffLiq
     real(wp), dimension(nPoints,nSubCols) :: &
-        modis_CloudMask
+        modis_CloudMask,modis_iceCloudMask
 
     ! LOCAL VARIABLES
     real(wp), parameter :: &
@@ -428,6 +428,12 @@ contains
         modis_CloudMask = 1._wp
     elsewhere
         modis_CloudMask = 0._wp
+    endwhere
+    
+    where(iceCloudMask) 
+        modis_iceCloudMask = 1._wp
+    elsewhere
+        modis_iceCloudMask = 0._wp
     endwhere
 
   end subroutine modis_column
