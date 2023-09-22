@@ -333,8 +333,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          tautot_liq,       & ! CALIPSO optical thickness liquid
          tautot_ice,       & ! CALIPSO optical thickness ice
          lidarcldflag        ! CALIPSO cloud flag 
-    !real(wp), dimension(Npoints,Nlevels,Nphase),intent(in) :: &
-    !     lidarcldphase       ! CALIPSO cloud fraction by phase [2=liquid]
 
     ! Outputs
     real(wp),dimension(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS),intent(inout) :: &
@@ -355,9 +353,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          nhetcld              ! # of heterogenous clouds (stratocumulus above/below cumulus) in continuous layer
      real(wp),dimension(Npoints,NOBSTYPE),intent(inout) :: obs_ntotal     ! # of Observations
      real(wp),dimension(Npoints,SLWC_NCOT,COT_NCLASS),intent(inout) :: slwccot_ntotal ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin
-     !real(wp),dimension(Npoints,SLWC_NCOT,3),intent(inout) :: slwccot_ntotal     ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin, MODIS/CALIPSO
-
-
+   
     ! Local variables
     integer  :: i, j, k
     integer  :: ix, iy, cs
@@ -383,9 +379,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
     fracout_int(:,:,:) = NINT( fracout(:,:,:) )  !! assign an integer subpixel ID (0=clear-sky; 1=St; 2=Cu)
     modis_cond(:) = .false.
-    
-    !print*,"zlev(1,Nlevels) = ", zlev(1,Nlevels)
-    !print*,"zlev(1,1) = ", zlev(1,1)
+  
 
     !! initialize
     slwccot(:,:) = R_UNDEF
@@ -395,12 +389,9 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     modiscs_multi(:,:) = .false.
     modiscs_coldct(:,:) = .false.
     do i = 1, Npoints
-!       if ( lwp(i) .eq. R_UNDEF ) then  ! for non-sunlit columns
        if ( sunlit(i) .le. 0 ) then  ! for non-sunlit columns
           cfodd_ntotal(i,:,:,:) = R_UNDEF
           wr_occfreq_ntotal(i,:) = R_UNDEF
-!          icod(i,:,:) = R_UNDEF
-!         icod_cal(i,:,:) = R_UNDEF
           lsmallcot(i) = R_UNDEF
           mice(i) = R_UNDEF
           lsmallreff(i) = R_UNDEF
@@ -411,16 +402,11 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           nfracmulti(i) = R_UNDEF
           coldct(i) = R_UNDEF
           coldct_cal(i) = R_UNDEF
-!          slwccot(i,:) = R_UNDEF
-!          slwccot_cal(i,:) = R_UNDEF
           slwccot_ntotal(i,:,:) = R_UNDEF
-          !slwccot_ntotal_cal(i,:,:) = R_UNDEF
           calice(i) = R_UNDEF
        else
           cfodd_ntotal(i,:,:,:)  = 0._wp
           wr_occfreq_ntotal(i,:) = 0._wp
- !         icod(i,:,:) = 0._wp
- !         icod_cal(i,:,:) = 0._wp
           lsmallcot(i) = 0._wp
           mice(i) = 0._wp
           lsmallreff(i) = 0._wp
@@ -431,10 +417,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           nfracmulti(i) = 0._wp
           coldct(i) = 0._wp
           coldct_cal(i) = 0._wp
-!          slwccot(i,:) = 0._wp
-!          slwccot_cal(i,:) = 0._wp
           slwccot_ntotal(i,:,:) = 0._wp
-          !slwccot_ntotal_cal(i,:,:) = 
           calice(i) = 0._wp
        endif
     enddo
@@ -442,7 +425,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     do i = 1, Npoints
         !! Total Sampling Frequency
        do j = 1, Ncolumns, 1
-!          if( lwp(i).eq.R_UNDEF ) cycle ! remove non-sunlit columns
           if ( sunlit(i) .le. 0 ) cycle ! remove non-sunlit columns
           obs_ntotal(i,1) = obs_ntotal(i,1) + 1._wp  ! all-sky (# of all samples)
           obstype = 2                      ! initial flag (2 = clear sky)
@@ -450,8 +432,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           do k = 1, Nlevels - 2  !masking out through 960m above ground, groundclutter
              if ( dbze   (i,j,k) .ge. CFODD_DBZE_MIN .and. &
                 & dbze   (i,j,k) .le. CFODD_DBZE_MAX ) then
-                !.and. &
-                !& fracout(i,j,k) .ne. SGCLD_CLR            ) then
                 obstype = 3  ! cloudy sky
              endif
           enddo !Nlevels
@@ -460,7 +440,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
        enddo !Ncolumns
 
        !! check by MODIS retrieval
-!       if ( lwp(i)     .eq.  R_UNDEF        .or.  &       !! exclude non-sunlit
        if ( sunlit(i)  .le.  0              .or.  &       !! exclude non-sunlit
           & lwp(i)     .le.  CWP_THRESHOLD  .or.  &
           & liqcot(i)  .le.  COT_THRESHOLD  .or.  &
@@ -495,7 +474,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              if ( dbze(i,j,k) .eq. R_GROUND .or. &
                   dbze(i,j,k) .eq. R_UNDEF       ) cycle
              if ( ocbtm                              .and. &
-                !& fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &
                 & dbze(i,j,k)        .ge. CFODD_DBZE_MIN   ) then
                 ocbtm = .false.  !! cloud bottom detected
                 kcbtm = k
@@ -503,7 +481,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              endif
              if (       octop                        .and. &  !! scan cloud-top
                 & .not. ocbtm                        .and. &  !! cloud-bottom already detected
-                !& fracout_int(i,j,k) .ne. SGCLD_CLR  .and. &  !! exclude clear sky
                 & dbze(i,j,k)        .ge. CFODD_DBZE_MIN   ) then
                 kctop = k  !! update
              endif
@@ -516,7 +493,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
               modiscs_coldct(i,j) = .true.
               icoldct = .true.
           endif
-          !if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
           oslwc = .true.
           hetcld = .false.
           multilcld = .false.
@@ -526,16 +502,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !CDIR NOLOOPCHG
           do k = kcbtm, kctop, -1
              cmxdbz = max( cmxdbz, dbze(i,j,k) )  !! column maximum dBZe update
-             !if ( fracout_int(i,j,k) .eq. SGCLD_CLR  .or.  &
-             !   & fracout_int(i,j,k) .eq. SGCLD_CUM  .or.  &
-             !   & dbze       (i,j,k) .lt. CFODD_DBZE_MIN   ) then
-             !   oslwc = .false.
-             !endif
 
              if ( fracout_int(i,j,k) .eq. SGCLD_CUM .and.  &
                 & .not. multilcld ) then
                 hetcld = .true.
-                !oslwc = .false.
             endif
             if ( fracout_int(i,j,k) .eq. SGCLD_CLR) then
                 fracmulti = .true.
@@ -563,14 +533,12 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
 
           !! warm-rain occurrence frequency
           iregime = 0
-          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct ) then !.and. &
-              !& .not. fracmulti ) then
+          if( cmxdbz .lt. CFODD_BNDZE(1) .and. .not. icoldct ) then 
              iregime = 1  !! non-precipitating
           elseif( (cmxdbz .ge. CFODD_BNDZE(1)) .and. (cmxdbz .lt. CFODD_BNDZE(2)) &
-                  .and. .not. icoldct ) then !.and. .not. fracmulti ) then
+                  .and. .not. icoldct ) then
              iregime = 2  !! drizzling
-          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then!.and. &
-                 !& .not. fracmulti ) then
+          elseif( cmxdbz .ge. CFODD_BNDZE(2) .and. .not. icoldct ) then
              iregime = 3  !! raining
           elseif ( cmxdbz .lt. CFODD_BNDZE(1) .and. icoldct ) then
              iregime = 4  !! cold cloud top, non-precip
@@ -610,13 +578,13 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           scolcls3(:,:) = 0 
           
           if (    liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
-               .not. icoldct ) then !.and. .not. fracmulti ) then
+               .not. icoldct ) then
              icls = 1
           elseif( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
-               .not. icoldct ) then !.and. .not. fracmulti ) then
+               .not. icoldct ) then
              icls = 2
           elseif( liqreff(i) .ge. CFODD_BNDRE(3) .and. liqreff(i) .le. CFODD_BNDRE(4) .and. &
-               .not. icoldct ) then ! .and. .not. fracmulti ) then
+               .not. icoldct ) then
              icls = 3
           endif
           
@@ -739,15 +707,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                      slwccot_cls(1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )       
                       
        enddo ! cs (classes)
-          
-       !! # of samples for CFODD (joint 2d-histogram dBZe vs ICOD)
-!       call hist2d( dbze(i,1:Ncolumns,1:Nlevels), icod(i,1:Ncolumns,1:Nlevels), &
-!                  & Ncolumns*Nlevels,                                           &
-!                  & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,   &
-!                  & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, icls )       )
-    
-!       slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                     &
-!                     slwccot(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
 
     enddo     ! i (Npoints)
 
@@ -762,9 +721,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
         ulmodis = .false.
         if( sunlit(i) .le. 0 .or.  & ! remove non-sunlit columns for MODIS detection of SLWCs 
             sum(wr_occfreq_ntotal(i,1:WR_NREGIME) ) .ge. 1.0_wp ) cycle !exclude columns where MODIS/CloudSat detected SLWCs already
-           ! iwp(i)     .gt.  CWP_THRESHOLD  .or.  &       !! exclude columns with ice clouds detected by MODIS
-           ! icecot(i)  .gt.  COT_THRESHOLD  .or.  &       !! exclude columns ice clouds detected by MODIS
-           ! icereff(i) .gt.  CFODD_BNDRE(1)       ) cycle !! exclude coulmns with ice clouds detected by MODIS
 
         if( iwp(i)     .gt.  CWP_THRESHOLD  .or.  &       !! exclude columns with ice clouds detected by MODIS
             icecot(i)  .gt.  COT_THRESHOLD  .or.  &       !! exclude columns ice clouds detected by MODIS
@@ -891,7 +847,6 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
        
     !! CMB adding counts of other cloud types to assess frequency of single-layer warm phase clouds
     do i = 1, Npoints
-!       if (lwp(i) .eq. R_UNDEF) cycle !remove non-sunlit columns
        if (sunlit(i) .le. 0 ) cycle !remove non-sunlit columns
              if ( lwp(i)     .gt.  CWP_THRESHOLD .and. &
                 & liqcot(i)  .le.  COT_THRESHOLD  .and.  &
