@@ -321,7 +321,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          temp                ! temperature [K]
     real(wp), dimension(Npoints,Ncolumns,Nlevels),intent(in) :: &
          fracout,          & ! SCOPS subcolumn retrieval
-         dbze,             & ! Radar reflectivity [dBZe]
+         dbze                ! Radar reflectivity [dBZe]
 
     ! Outputs
     real(wp),dimension(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS),intent(inout) :: &
