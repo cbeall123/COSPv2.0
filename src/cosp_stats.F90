@@ -188,7 +188,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
   ! All rights reserved.
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   SUBROUTINE COSP_LIDAR_ONLY_CLOUD(Npoints, Ncolumns, Nlevels, beta_tot, beta_mol,       &
-     Ze_tot, lidar_only_freq_cloud, tcc, radar_tcc, radar_tcc2)
+     Ze_tot, lidar_only_freq_cloud, tcc, radar_tcc, radar_tcc2, radarCloudMask)
     ! Inputs
     integer,intent(in) :: &
          Npoints,       & ! Number of horizontal gridpoints
@@ -206,6 +206,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          tcc,       & !
          radar_tcc, & !
          radar_tcc2   !
+    real(wp),dimension(Npoints,Ncolumns),intent(out):: &
+         radarCloudMask
     
     ! local variables
     real(wp) :: sc_ratio
@@ -218,6 +220,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     tcc = 0._wp
     radar_tcc = 0._wp
     radar_tcc2 = 0._wp
+    radarCloudMask(:,:) = 0._wp
     do pr=1,Npoints
        do i=1,Ncolumns
           flag_sat = 0
@@ -247,7 +250,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           enddo !levels
           if (flag_cld .eq. 1) tcc(pr)=tcc(pr)+1._wp
           if (flag_radarcld .eq. 1) radar_tcc(pr)=radar_tcc(pr)+1.
-          if (flag_radarcld_no1km .eq. 1) radar_tcc2(pr)=radar_tcc2(pr)+1.        
+          if (flag_radarcld_no1km .eq. 1) then
+             radar_tcc2(pr)=radar_tcc2(pr)+1.
+             radarCloudMask(pr,i) = 1._wp
+          endif
        enddo !columns
     enddo !points
     lidar_only_freq_cloud=lidar_only_freq_cloud/Ncolumns
