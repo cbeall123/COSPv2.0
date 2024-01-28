@@ -194,7 +194,7 @@ program cosp2_test
              Lclmodis,Ltbrttov,Lptradarflag0,Lptradarflag1,Lptradarflag2,Lptradarflag3,  &
              Lptradarflag4,Lptradarflag5,Lptradarflag6,Lptradarflag7,Lptradarflag8,      &
              Lptradarflag9,Lradarpia,                                                    &
-             Lwr_occfreq, Lcfodd
+             Lwr_occfreq, Lcfodd, Lwr_occfreq_extra, Lwr_occfreq_calipso
   namelist/COSP_OUTPUT/Lcfaddbze94,Ldbze94,Latb532,LcfadLidarsr532,Lclcalipso,           &
                        Lclhcalipso,Lcllcalipso,Lclmcalipso,Lcltcalipso,LparasolRefl,     &
                        Lclcalipsoliq,Lclcalipsoice,Lclcalipsoun,Lclcalipsotmp,           &
@@ -220,7 +220,7 @@ program cosp2_test
                        Lptradarflag0,Lptradarflag1,Lptradarflag2,Lptradarflag3,          &
                        Lptradarflag4,Lptradarflag5,Lptradarflag6,Lptradarflag7,          &
                        Lptradarflag8,Lptradarflag9,Lradarpia,                            &
-                       Lwr_occfreq, Lcfodd
+                       Lwr_occfreq, Lcfodd, Lwr_occfreq_extra, Lwr_occfreq_calipso
 
   ! Local variables
   logical :: &
@@ -422,7 +422,7 @@ program cosp2_test
        LcfadDbze94, Ldbze94, Lparasolrefl,                                               &
        Ltbrttov, Lptradarflag0,Lptradarflag1,Lptradarflag2,Lptradarflag3,Lptradarflag4,  &
        Lptradarflag5,Lptradarflag6,Lptradarflag7,Lptradarflag8,Lptradarflag9,Lradarpia,  &
-       Lwr_occfreq, Lcfodd,                                                              &
+       Lwr_occfreq, Lcfodd, Lwr_occfreq_extra, Lwr_occfreq_calipso,                      &
        Npoints, Ncolumns, Nlevels, Nlvgrid_local, rttov_Nchannels, cospOUT)
 
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1058,6 +1058,7 @@ contains
                                     Lptradarflag3,Lptradarflag4,Lptradarflag5,           &
                                     Lptradarflag6,Lptradarflag7,Lptradarflag8,           &
                                     Lptradarflag9,Lradarpia,Lwr_occfreq,Lcfodd,          &
+                                    Lwr_occfreq_extra, Lwr_occfreq_calipso,              &
                                     Npoints,Ncolumns,Nlevels,Nlvgrid,Nchan,x)
      ! Inputs
      logical,intent(in) :: &
@@ -1168,7 +1169,9 @@ contains
          Lptradarflag9,    & ! CLOUDSAT 
          Lradarpia,        & ! CLOUDSAT 
          Lwr_occfreq,      & ! CloudSat+MODIS joint diagnostics
-         Lcfodd              ! CloudSat+MODIS joint diagnostics
+         Lcfodd,           & ! CloudSat+MODIS joint diagnostics
+         Lwr_occfreq_extra,& ! CMB - CloudSat+MODIS joint diagnostics 
+         Lwr_occfreq_calipso ! CMB - CALIPSO+MODIS joint diagnostics
          
      integer,intent(in) :: &
           Npoints,         & ! Number of sampled points
@@ -1333,8 +1336,32 @@ contains
     if (Ltbrttov) allocate(x%rttov_tbs(Npoints,Nchan))
 
     ! Joint MODIS/CloudSat Statistics
-    if (Lwr_occfreq)  allocate(x%wr_occfreq_ntotal(Npoints,WR_NREGIME))
-    if (Lcfodd)       allocate(x%cfodd_ntotal(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS))
+    if (Lwr_occfreq) then
+        allocate(x%wr_occfreq_ntotal(Npoints,WR_NREGIME))
+        allocate(x%obs_ntotal(Npoints,NOBSTYPE))
+        allocate(x%slwccot(Npoints,SLWC_NCOT,COT_NCLASS)) !CMB
+        allocate(x%modisandcloudsat_cf(Npoints)) !CMB
+    if (Lcfodd) allocate(x%cfodd_ntotal(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS))
+    
+    if (Lwr_occfreq_extra) then
+        allocate(x%lsmallcot(Npoints))
+        allocate(x%mice(Npoints))
+        allocate(x%lsmallreff(Npoints))
+        allocate(x%lbigreff(Npoints))
+        allocate(x%nmultilcld(Npoints,2))
+        allocate(x%nfracmulti(Npoints))
+        allocate(x%nhetcld(Npoints,2))
+        allocate(x%coldct(Npoints))
+        allocate(x%coldct_cal(Npoints))
+        allocate(x%calice(Npoints))
+    endif
+    
+    ! Joint MODIS/CALIPSO Statistics - CMB 
+    if(Lwr_occfreq_calipso) then
+        allocate(x%modis_calipso_cf(Npoints))
+        allocate(x%modisandcalipso_cf(Npoints))
+        allocate(x%modisandcalipso_icecf(Npoints))
+    endif
 
   end subroutine construct_cosp_outputs
   
