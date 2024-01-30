@@ -42,7 +42,8 @@ program cosp2_test
                                  CFODD_DBZE_MIN,   CFODD_DBZE_MAX,                        &
                                  CFODD_ICOD_MIN,   CFODD_ICOD_MAX,                        &
                                  CFODD_DBZE_WIDTH, CFODD_ICOD_WIDTH,                      &
-                                 WR_NREGIME,                                              &
+                                 WR_NREGIME, SLWC_NCOT, COT_NCLASS,                       &
+                                 NOBSTYPE,                                                &
                                  numMODISTauBins,numMODISPresBins,                        &
                                  numMODISReffIceBins,numMODISReffLiqBins,                 &
                                  numISCCPTauBins,numISCCPPresBins,numMISRTauBins,         &
@@ -1208,8 +1209,10 @@ contains
     
     ! MODIS simulator
     if (Lcltmodis)     allocate(x%modis_Cloud_Fraction_Total_Mean(Npoints))
+    if (Lcltmodis)     allocate(x%modis_CloudMask(Npoints,Ncolumns))
     if (Lclwmodis)     allocate(x%modis_Cloud_Fraction_Water_Mean(Npoints))
     if (Lclimodis)     allocate(x%modis_Cloud_Fraction_Ice_Mean(Npoints))
+    if (Lclimodis)     allocate(x%modis_iceCloudMask(Npoints,Ncolumns))
     if (Lclhmodis)     allocate(x%modis_Cloud_Fraction_High_Mean(Npoints))
     if (Lclmmodis)     allocate(x%modis_Cloud_Fraction_Mid_Mean(Npoints))
     if (Lcllmodis)     allocate(x%modis_Cloud_Fraction_Low_Mean(Npoints))
@@ -1341,6 +1344,8 @@ contains
         allocate(x%obs_ntotal(Npoints,NOBSTYPE))
         allocate(x%slwccot(Npoints,SLWC_NCOT,COT_NCLASS)) !CMB
         allocate(x%modisandcloudsat_cf(Npoints)) !CMB
+    endif
+    
     if (Lcfodd) allocate(x%cfodd_ntotal(Npoints,CFODD_NDBZE,CFODD_NICOD,CFODD_NCLASS))
     
     if (Lwr_occfreq_extra) then
@@ -1749,6 +1754,66 @@ contains
         deallocate(y%wr_occfreq_ntotal)
         nullify(y%wr_occfreq_ntotal)
      endif
+     if (associated(y%slwccot)) then
+        deallocate(y%slwccot)
+        nullify(y%slwccot)
+     endif
+     if (associated(y%modisandcloudsat_cf)) then
+        deallocate(y%modisandcloudsat_cf)
+        nullify(y%modisandcloudsat_cf)
+     endif
+     if (associated(y%lsmallcot)) then
+        deallocate(y%lsmallcot)
+        nullify(y%lsmallcot)
+     endif
+     if (associated(y%mice)) then
+        deallocate(y%mice)
+        nullify(y%mice)
+     endif
+     if (associated(y%lsmallreff)) then
+        deallocate(y%lsmallreff)
+        nullify(y%lsmallreff)
+     endif
+     if (associated(y%lbigreff)) then
+        deallocate(y%lbigreff)
+        nullify(y%lbigreff)
+     endif
+     if (associated(y%nmultilcld)) then
+        deallocate(y%nmultilcld)
+        nullify(y%nmultilcld)
+     endif
+     if (associated(y%nfracmulti)) then
+        deallocate(y%nfracmulti)
+        nullify(y%nfracmulti)
+     endif
+     if (associated(y%nhetcld)) then
+        deallocate(y%nhetcld)
+        nullify(y%nhetcld)
+     endif
+     if (associated(y%coldct)) then
+        deallocate(y%coldct)
+        nullify(y%coldct)
+     endif
+     if (associated(y%coldct_cal)) then
+        deallocate(y%coldct_cal)
+        nullify(y%coldct_cal)
+     endif
+     if (associated(y%calice)) then
+        deallocate(y%calice)
+        nullify(y%calice)
+     endif
+     if (associated(y%modis_calipso_cf)) then
+        deallocate(y%modis_calipso_cf)
+        nullify(y%modis_calipso_cf)
+     endif
+     if (associated(y%modisandcalipso_cf)) then
+        deallocate(y%modisandcalipso_cf)
+        nullify(y%modisandcalipso_cf)
+     endif    
+     if (associated(y%modisandcalipso_icecf)) then
+        deallocate(y%modisandcalipso_icecf)
+        nullify(y%modisandcalipso_icecf)
+     endif    
 
    end subroutine destroy_cosp_outputs
   

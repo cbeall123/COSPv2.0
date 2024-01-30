@@ -310,7 +310,7 @@ MODULE MOD_COSP
           nhetcld => null(),           & ! # of continuous heterogenous (e.g., stratocumulus+ cumulus) cloud subcolumns excluded from SLWC analysis (Npoints,2)
           obs_ntotal => null()          ! # of total obs/clear-sky/cloud-sky (Npoints,NOBSTYPE)
      real(wp),dimension(:,:,:),pointer :: &
-          slwccot => null()             ! COT of SLWCs(Npoints,SLWC_NCOT,CFODD_NCLASS)
+          slwccot => null()             ! COT of SLWCs(Npoints,SLWC_NCOT,COT_NCLASS)
      real(wp),dimension(:),      pointer :: &
           lsmallcot => null(),       & ! # of liquid clouds with COT below threshold (Npoints)
           mice => null(),            & ! # of ice clouds (Npoints)
@@ -414,7 +414,7 @@ CONTAINS
          out1D_1,out1D_2,out1D_3,out1D_4,out1D_5,out1D_6,out1D_7,out1D_8,       &
          out1D_9,out1D_10,out1D_11,out1D_12
     real(wp),dimension(:),allocatable,target :: &
-         out1D_13
+         out1D_13,out1D_14
     real(wp),dimension(:,:,:),allocatable :: &
        betamol_in,betamoli,pnormi,ze_toti,ze_noni
     real(wp),dimension(:,:,:),allocatable :: &
@@ -653,7 +653,7 @@ CONTAINS
        Lcloudsat_subcolumn = .true.
        Lcloudsat_modis_wr  = .true. ! WR: warm rain product
     endif
-    
+    print*, 'Lmodis_column status: ', Lmodis_column
     !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     ! 2b) Error Checking
     !     Enforce bounds on input fields. If input field is out-of-bounds, report error
@@ -1135,6 +1135,10 @@ CONTAINS
           allocate(out1D_13(Npoints*Nlvgrid*calipsoIN%Ncolumns)) 
           cospOUT%calipso_lidarcldflag(ij:ik,1:calipsoIN%Ncolumns,1:Nlvgrid) => out1D_13 
        endif
+       if (.not. associated(cospOUT%calipso_lidarcldflag_cs)) then
+          allocate(out1D_14(Npoints*calipsoIN%Ncolumns)) 
+          cospOUT%calipso_lidarcldflag_cs(ij:ik,1:calipsoIN%Ncolumns) => out1D_14 
+       endif
        
        ! Call simulator
        ok_lidar_cfad=.true.
@@ -1204,10 +1208,14 @@ CONTAINS
           deallocate(out1D_11) 
           nullify(cospOUT%calipso_cldthinemis)
        endif
-       if (allocated(out1D_13)) then 
-          deallocate(out1D_13) 
-          nullify(cospOUT%calipso_lidarcldflag)
-       endif
+       !if (allocated(out1D_13)) then 
+       !   deallocate(out1D_13) 
+       !   nullify(cospOUT%calipso_lidarcldflag)
+       !endif
+       !if (allocated(out1D_14)) then 
+       !   deallocate(out1D_14) 
+       !   nullify(cospOUT%calipso_lidarcldflag_cs)
+       !endif
     endif
 
     ! GROUND LIDAR Simulator
@@ -1344,8 +1352,9 @@ CONTAINS
     endif
 
     ! MODIS
+    print*, 'any sunlit columns? ', modisIN%nSunlit > 0
     if (Lmodis_column) then
-       if(modisiN%nSunlit > 0) then
+       if(modisIN%nSunlit > 0) then
           ! Allocate space for local variables
           allocate(modisCftotal(modisIN%nSunlit), modisCfLiquid(modisIN%nSunlit),        &
                    modisCfIce(modisIN%nSunlit),modisCfHigh(modisIN%nSunlit),             &
@@ -1378,10 +1387,12 @@ CONTAINS
                              modisJointHistogramIce,modisJointHistogramLiq,              &
                              modisCloudMask,modisiceCloudMask)
           ! Store data (if requested)
+          print*, 'is cospOUT%modis_Cloud_Fraction_Total_Mean associated? ', associated(cospOUT%modis_Cloud_Fraction_Total_Mean)
           if (associated(cospOUT%modis_Cloud_Fraction_Total_Mean)) then
              cospOUT%modis_Cloud_Fraction_Total_Mean(ij+int(modisIN%sunlit(:))-1)   =    &
                   modisCfTotal
           endif
+          print*, 'is cospOUT%modis_CloudMask associated? ', associated(cospOUT%modis_CloudMask)
           if (associated(cospOUT%modis_CloudMask)) then
              cospOUT%modis_CloudMask(ij+int(modisIN%sunlit(:))-1,:)   =    &
                   modisCloudMask
@@ -1838,6 +1849,12 @@ CONTAINS
         allocate( modisandcalipso_icecf(calipsoIN%Npoints) )
         modis_calipso_cldflag(:,:) = 0._wp
         modis_calipso_cf(:) = R_UNDEF
+        
+        print *, 'Size of cospOUT%modis_CloudMask in dimension 1: ', size(cospOUT%modis_CloudMask, 1)
+        print *, 'Size of cospOUT%modis_CloudMask in dimension 2: ', size(cospOUT%modis_CloudMask, 2)
+        print *, 'Size of cospOUT%calipso_lidarcldflag_csin dimension 1: ', size(cospOUT%calipso_lidarcldflag_cs, 1)
+        print *, 'Size of cospOUT%calipso_lidarcldflag_cs in dimension 2: ', size(cospOUT%calipso_lidarcldflag_cs, 2)
+
 
         where( (cospOUT%modis_CloudMask .eq. 1._wp) .or. &
                (cospOUT%calipso_lidarcldflag_cs .eq. 1._wp) )
