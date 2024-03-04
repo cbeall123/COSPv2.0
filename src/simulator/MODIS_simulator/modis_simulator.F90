@@ -113,10 +113,21 @@ contains
   !       and reverts to a thermal algorithm much like ISCCP's. Rather than replicate that 
   !       alogrithm in this simulator we simply report the values from the ISCCP simulator. 
   ! ########################################################################################
-  subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, optical_thickness,       & 
-                         tauLiquidFraction, g, w0, atemp, isccpCloudTopPressure,         &
-                         retrievedPhase, modis_nlayer, retrievedCloudTopPressure,        &
-                         retrievedTau,   retrievedSize, modis_sctt)
+  subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, &
+                         temperature,             & ! YQIN 01/18/23 added
+                         optical_thickness,       & 
+                         tauLiquidFraction, g, w0,isccpCloudTopPressure,                 &
+                         isccpCloudTopTemperature, & ! YQIN 01/18/23 added
+                         retrievedPhase, retrievedCloudTopPressure,                      &
+                         retrievedCloudTopTemperature, & ! YQIN 01/18/23 added
+                         retrievedCloudTopNd_Q06, & ! YQIN 01/18/23 added
+                         retrievedCloudTopLWP_Q06, & ! YQIN 01/26/23 added
+                         retrievedCloudTopTau_Q06, retrievedCloudTopSize_Q06, & ! YQIN 03/04/23 added
+                         retrievedCloudTopNd_ALL, & ! YQIN 02/29/24 added
+                         retrievedCloudTopLWP_ALL, & ! YQIN 
+                         retrievedCloudTopTau_ALL, retrievedCloudTopSize_ALL, & ! YQIN 03/04/23 added
+                         retrievedTau,   retrievedSize, &
+                         modis_sctt )
 
     ! INPUTS
     integer,intent(in) :: &
@@ -140,6 +151,15 @@ contains
          modis_nlayer                 ! MODIS multilayer cloud flag (number of cloud layers detected)
     real(wp),dimension(nSubCols), intent(inout) :: &
          retrievedCloudTopPressure, & ! MODIS retrieved CTP (Pa)
+         retrievedCloudTopTemperature, & ! MODIS retrieved cloud top temperature (K) ! YQIN 01/18/23
+         retrievedCloudTopNd_Q06,       & ! MODIS retrieved Nd ! YQIN 01/18/23
+         retrievedCloudTopLWP_Q06,      & ! MODIS retrieved LWP (same sampling as Nd) ! YQIN 
+         retrievedCloudTopTau_Q06,      & ! MODIS retrieved Tau (same sampling as Nd) ! YQIN
+         retrievedCloudTopSize_Q06,     & ! MODIS retrieved Size (same sampling as Nd) ! YQIN
+         retrievedCloudTopNd_ALL,       & ! MODIS retrieved Nd ! YQIN 02/29/24
+         retrievedCloudTopLWP_ALL,      & ! MODIS retrieved LWP (same sampling as Nd) ! YQIN 
+         retrievedCloudTopTau_ALL,      & ! MODIS retrieved Tau (same sampling as Nd) ! YQIN
+         retrievedCloudTopSize_ALL,     & ! MODIS retrieved Size (same sampling as Nd) ! YQIN
          retrievedTau,              & ! MODIS retrieved optical depth (unitless)              
          retrievedSize,             & ! MODIS retrieved particle size (microns)              
          modis_sctt                   ! MODIS cloud top temperature for WRDs (K)
@@ -284,12 +304,25 @@ contains
   end subroutine modis_subcolumn
 
   ! ########################################################################################
-  subroutine modis_column(nPoints,nSubCols,phase, cloud_top_pressure, optical_thickness, particle_size,     &
+  subroutine modis_column(nPoints,nSubCols,phase, cloud_top_pressure,  &
+       cloud_top_temperature, & ! YQIN 01/18/23
+       cloud_top_Nd_Q06, cloud_top_LWP_Q06, & ! YQIN 01/18/23
+       cloud_top_Tau_Q06, cloud_top_Size_Q06, & ! YQIN 04/03/23
+       cloud_top_Nd_ALL, cloud_top_LWP_ALL, & ! YQIN 02/29/24
+       cloud_top_Tau_ALL, cloud_top_Size_ALL, & ! YQIN
+       optical_thickness, particle_size,     &
        Cloud_Fraction_Total_Mean,         Cloud_Fraction_Water_Mean,         Cloud_Fraction_Ice_Mean,        &
+       Cloud_Fraction_Nd_Q06_Mean,  & ! YQIN 01/18/23
+       Cloud_Fraction_Nd_ALL_Mean,  & ! YQIN 02/29/24
        Cloud_Fraction_High_Mean,          Cloud_Fraction_Mid_Mean,           Cloud_Fraction_Low_Mean,        &
        Optical_Thickness_Total_Mean,      Optical_Thickness_Water_Mean,      Optical_Thickness_Ice_Mean,     &
        Optical_Thickness_Total_MeanLog10, Optical_Thickness_Water_MeanLog10, Optical_Thickness_Ice_MeanLog10,&
        Cloud_Particle_Size_Water_Mean,    Cloud_Particle_Size_Ice_Mean,      Cloud_Top_Pressure_Total_Mean,  &
+       Cloud_Top_Temperature_Total_Mean,  & !YQIN 01/18/23
+       Cloud_Top_Nd_Q06_Total_Mean,           Cloud_top_LWP_Q06_Total_Mean,       & ! YQIN 01/18/23
+       Cloud_top_Tau_Q06_Total_Mean,          Cloud_Top_Size_Q06_Total_Mean,                                         & ! YQIN 04/04/23
+       Cloud_Top_Nd_ALL_Total_Mean,           Cloud_top_LWP_ALL_Total_Mean,       & ! YQIN 02/29/24
+       Cloud_top_Tau_ALL_Total_Mean,          Cloud_Top_Size_ALL_Total_Mean,                                         & ! YQIN
        Liquid_Water_Path_Mean,            Ice_Water_Path_Mean,                                               &    
        Optical_Thickness_vs_Cloud_Top_Pressure,Optical_Thickness_vs_ReffIce,Optical_Thickness_vs_ReffLiq,    & 
        Optical_Thickness_vs_Cloud_Top_Pressure_Liq,  & ! YQIN 04/04/23
@@ -305,6 +338,11 @@ contains
          phase                             
     real(wp),intent(in),dimension(nPoints, nSubCols) ::  &
          cloud_top_pressure,                &
+         cloud_top_temperature, & ! YQIN 01/18/23 
+         cloud_top_Nd_Q06, cloud_top_LWP_Q06, & ! YQIN 01/18/23
+         cloud_top_Tau_Q06, cloud_top_Size_Q06, & ! YQIN 04/03/23
+         cloud_top_Nd_ALL, cloud_top_LWP_ALL, & ! YQIN 02/29/24
+         cloud_top_Tau_ALL, cloud_top_Size_ALL, & ! YQIN
          optical_thickness,                 &
          particle_size
  
@@ -312,6 +350,8 @@ contains
     real(wp),intent(inout),dimension(nPoints)  ::   & !
          Cloud_Fraction_Total_Mean,         & !
          Cloud_Fraction_Water_Mean,         & !
+         Cloud_Fraction_Nd_Q06_Mean,            & ! YQIN 01/18/23
+         Cloud_Fraction_Nd_ALL_Mean,            & ! YQIN 02/29/24
          Cloud_Fraction_Ice_Mean,           & !
          Cloud_Fraction_High_Mean,          & !
          Cloud_Fraction_Mid_Mean,           & !
@@ -325,6 +365,15 @@ contains
          Cloud_Particle_Size_Water_Mean,    & !
          Cloud_Particle_Size_Ice_Mean,      & !
          Cloud_Top_Pressure_Total_Mean,     & !
+         Cloud_Top_Temperature_Total_Mean,  & ! YQIN 01/18/23
+         Cloud_Top_Nd_Q06_Total_Mean,           & ! YQIN 
+         Cloud_Top_LWP_Q06_Total_Mean,          & ! YQIN 
+         Cloud_Top_Tau_Q06_Total_Mean,          & ! YQIN
+         Cloud_Top_Size_Q06_Total_Mean,         & ! YQIN
+         Cloud_Top_Nd_ALL_Total_Mean,           & ! YQIN  02/29/24
+         Cloud_Top_LWP_ALL_Total_Mean,          & ! YQIN 
+         Cloud_Top_Tau_ALL_Total_Mean,          & ! YQIN
+         Cloud_Top_Size_ALL_Total_Mean,         & ! YQIN
          Liquid_Water_Path_Mean,            & !
          Ice_Water_Path_Mean                  !
     real(wp),intent(inout),dimension(nPoints,numMODISTauBins,numMODISPresBins) :: &
@@ -344,13 +393,15 @@ contains
 
     ! LOCAL VARIABLES
     real(wp), parameter :: &
-         LWP_conversion = 2._wp/3._wp * 1000._wp ! MKS units  
-    integer :: j
+         LWP_conversion = 5._wp/9._wp * 1000._wp ! MKS units  
+    integer :: j, i
     logical, dimension(nPoints,nSubCols) :: &
          cloudMask,      &
          waterCloudMask, &
          iceCloudMask,   &
-         validRetrievalMask
+         validRetrievalMask, &
+         cloudNdMask_Q06, & ! YQIN 01/18/23
+         cloudNdMask_ALL  ! YQIN 02/29/24
     real(wp),dimension(nPoints,nSubCols) :: &
          tauWRK,ctpWRK,reffIceWRK,reffLiqWRK, &
          tauLiqWRK,tauIceWRK,lwpWRK ! YQIN 04/04/23
@@ -366,6 +417,14 @@ contains
     iceCloudMask(1:nPoints,1:nSubCols)   = phase(1:nPoints,1:nSubCols) == phaseIsIce .and.    &
          validRetrievalMask(1:nPoints,1:nSubCols)
     
+    ! YQIN 01/18/23
+    !cloudNdMask(1:nPoints,1:nSubCols) = cloud_top_Nd(1:nPoints,1:nSubCols) > 0.
+    cloudNdMask_Q06(1:nPoints,1:nSubCols) = cloud_top_Nd_Q06(1:nPoints,1:nSubCols) .ne. R_UNDEF
+    cloudNdMask_ALL(1:nPoints,1:nSubCols) = cloud_top_Nd_ALL(1:nPoints,1:nSubCols) .ne. R_UNDEF
+
+    Cloud_Fraction_Nd_Q06_Mean(1:nPoints) = real(count(cloudNdMask_Q06, dim = 2))
+    Cloud_Fraction_Nd_ALL_Mean(1:nPoints) = real(count(cloudNdMask_ALL, dim = 2))
+
     ! ########################################################################################
     ! Use these as pixel counts at first 
     ! ########################################################################################
@@ -424,6 +483,54 @@ contains
     Cloud_Top_Pressure_Total_Mean  = sum(cloud_top_pressure, mask = cloudMask, dim = 2) / &
                                      max(1, count(cloudMask, dim = 2))
 
+    ! YQIN 01/18/23
+    Cloud_Top_Temperature_Total_Mean  = sum(cloud_top_temperature, mask = cloudMask, dim = 2) / &
+                                     max(1, count(cloudMask, dim = 2))
+
+    where(Cloud_Fraction_Nd_Q06_Mean(1:nPoints) > 0)
+        Cloud_Top_Nd_Q06_Total_Mean(1:nPoints)  = sum(cloud_top_Nd_Q06, mask = cloudNdMask_Q06, dim = 2) / &
+                                                 Cloud_Fraction_Nd_Q06_Mean(1:nPoints)
+    elsewhere
+        Cloud_Top_Nd_Q06_Total_Mean = R_UNDEF
+    endwhere
+
+    where(Cloud_Fraction_Nd_ALL_Mean(1:nPoints) > 0)
+        Cloud_Top_Nd_ALL_Total_Mean(1:nPoints)  = sum(cloud_top_Nd_ALL, mask = cloudNdMask_ALL, dim = 2) / &
+                                                 Cloud_Fraction_Nd_ALL_Mean(1:nPoints)
+    elsewhere
+        Cloud_Top_Nd_ALL_Total_Mean = R_UNDEF
+    endwhere
+
+    !write(*,*) 'PMA Nd     = ',Cloud_Top_Nd_Q06_Total_Mean
+    !write(*,*) 'PMA Nd  CF = ',Cloud_Fraction_Nd_Mean
+    !write(*,*) 'PMA LWP CF = ',Cloud_Fraction_LWP_Mean
+
+    where(Cloud_Fraction_Nd_Q06_Mean(1:nPoints) > 0)
+        Cloud_Top_LWP_Q06_Total_Mean(1:nPoints)  = sum(cloud_top_LWP_Q06, mask = cloudNdMask_Q06, dim = 2) / &
+                                                 Cloud_Fraction_Nd_Q06_Mean(1:nPoints)
+        Cloud_Top_Tau_Q06_Total_Mean(1:nPoints)  = sum(cloud_top_Tau_Q06, mask = cloudNdMask_Q06, dim = 2) / &
+                                                 Cloud_Fraction_Nd_Q06_Mean(1:nPoints)
+        Cloud_Top_Size_Q06_Total_Mean(1:nPoints)  = sum(cloud_top_Size_Q06, mask = cloudNdMask_Q06, dim = 2) / &
+                                                 Cloud_Fraction_Nd_Q06_Mean(1:nPoints)
+    elsewhere
+        Cloud_Top_LWP_Q06_Total_Mean = R_UNDEF
+        Cloud_Top_Tau_Q06_Total_Mean = R_UNDEF
+        Cloud_Top_Size_Q06_Total_Mean = R_UNDEF
+    endwhere
+
+    where(Cloud_Fraction_Nd_ALL_Mean(1:nPoints) > 0)
+        Cloud_Top_LWP_ALL_Total_Mean(1:nPoints)  = sum(cloud_top_LWP_ALL, mask = cloudNdMask_ALL, dim = 2) / &
+                                                 Cloud_Fraction_Nd_ALL_Mean(1:nPoints)
+        Cloud_Top_Tau_ALL_Total_Mean(1:nPoints)  = sum(cloud_top_Tau_ALL, mask = cloudNdMask_ALL, dim = 2) / &
+                                                 Cloud_Fraction_Nd_ALL_Mean(1:nPoints)
+        Cloud_Top_Size_ALL_Total_Mean(1:nPoints)  = sum(cloud_top_Size_ALL, mask = cloudNdMask_ALL, dim = 2) / &
+                                                 Cloud_Fraction_Nd_ALL_Mean(1:nPoints)
+    elsewhere
+        Cloud_Top_LWP_ALL_Total_Mean = R_UNDEF
+        Cloud_Top_Tau_ALL_Total_Mean = R_UNDEF
+        Cloud_Top_Size_ALL_Total_Mean = R_UNDEF
+    endwhere
+
     ! ########################################################################################
     ! Normalize pixel counts to fraction. 
     ! ########################################################################################
@@ -433,7 +540,11 @@ contains
     Cloud_Fraction_Total_Mean(1:nPoints) = Cloud_Fraction_Total_Mean(1:nPoints) /nSubcols
     Cloud_Fraction_Ice_Mean(1:nPoints)   = Cloud_Fraction_Ice_Mean(1:nPoints)   /nSubcols
     Cloud_Fraction_Water_Mean(1:nPoints) = Cloud_Fraction_Water_Mean(1:nPoints) /nSubcols
-    
+
+    ! YQIN 
+    Cloud_Fraction_Nd_Q06_Mean(1:nPoints)    = Cloud_Fraction_Nd_Q06_Mean(1:nPoints)  / nSubcols
+    Cloud_Fraction_Nd_ALL_Mean(1:nPoints)    = Cloud_Fraction_Nd_ALL_Mean(1:nPoints)  / nSubcols
+  
     ! ########################################################################################
     ! Joint histograms
     ! ########################################################################################
