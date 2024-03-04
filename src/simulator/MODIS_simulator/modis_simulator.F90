@@ -314,28 +314,34 @@ contains
          retrievedCloudTopTemperature(1:nSubCols) = isccpCloudTopTemperature  ! YQIN 01/18/23
     
     ! YQIN 01/18/23 calculate the Nd 
-    retrievedCloudTopNd(1:nSubCols)       = R_UNDEF
-    retrievedCloudTopLWP(1:nSubCols)      = R_UNDEF
-    retrievedCloudTopTau(1:nSubCols)      = R_UNDEF
-    retrievedCloudTopSize(1:nSubCols)     = R_UNDEF
+    retrievedCloudTopNd_Q06(1:nSubCols)       = R_UNDEF
+    retrievedCloudTopLWP_Q06(1:nSubCols)      = R_UNDEF
+    retrievedCloudTopTau_Q06(1:nSubCols)      = R_UNDEF
+    retrievedCloudTopSize_Q06(1:nSubCols)     = R_UNDEF
+
+    retrievedCloudTopNd_ALL(1:nSubCols)       = R_UNDEF
+    retrievedCloudTopLWP_ALL(1:nSubCols)      = R_UNDEF
+    retrievedCloudTopTau_ALL(1:nSubCols)      = R_UNDEF
+    retrievedCloudTopSize_ALL(1:nSubCols)     = R_UNDEF
 
 
     do i = 1, nSubCols
+        ! Sampling: Q06 method 
         if (cloudMask(i) & ! cloudy pixel
            .and. (retrievedPhase(i) == phaseIsLiquid) & ! liquid clouds
            .and. (retrievedCloudTopTemperature(i) > 268._wp .and. retrievedCloudTopTemperature(i) < 300._wp) & ! 268 K < CTT < 300 K
            .and. (retrievedTau(i) > 4._wp .and. retrievedSize(i) > 4.0e-6_wp)) then
 
             if (retrievedCloudTopTemperature(i).eq.R_UNDEF .or. retrievedTau(i).eq.R_UNDEF .or. retrievedSize(i).eq.R_UNDEF) then
-                retrievedCloudTopNd(i) = R_UNDEF
-                retrievedCloudTopLWP(i) = R_UNDEF
-                retrievedCloudTopTau(i) = R_UNDEF
-                retrievedCloudTopSize(i) = R_UNDEF
+                retrievedCloudTopNd_Q06(i) = R_UNDEF
+                retrievedCloudTopLWP_Q06(i) = R_UNDEF
+                retrievedCloudTopTau_Q06(i) = R_UNDEF
+                retrievedCloudTopSize_Q06(i) = R_UNDEF
 
             else
-                retrievedCloudTopLWP(i) = 5._wp/9._wp * 1000._wp * retrievedTau(i) * retrievedSize(i) ! derived LWP from Tau and Re
-                retrievedCloudTopTau(i) = retrievedTau(i)
-                retrievedCloudTopSize(i) = retrievedSize(i)
+                retrievedCloudTopLWP_Q06(i) = 5._wp/9._wp * 1000._wp * retrievedTau(i) * retrievedSize(i) ! derived LWP from Tau and Re
+                retrievedCloudTopTau_Q06(i) = retrievedTau(i)
+                retrievedCloudTopSize_Q06(i) = retrievedSize(i)
 
                 if (retrievedTau(i) * retrievedSize(i) > 0._wp) then ! ensure the derived LWP larger than zero because size has re_fill value
 
@@ -347,16 +353,55 @@ contains
                     call calNd_grosvenor18(retrievedCloudTopTemperature(i), &
                                           retrievedSize(i), & 
                                           retrievedTau(i), &
-                                          retrievedCloudTopNd(i))
+                                          retrievedCloudTopNd_Q06(i))
                     !write (*,*) 'calculating Nd...', 'temp=',retrievedCloudTopTemperature(i), 'tau=',retrievedTau(i), 'size=',retrievedSize(i), 'Nd=',retrievedCloudTopNd(i)
                 else
-                    retrievedCloudTopNd(i) = R_UNDEF
-                    retrievedCloudTopLWP(i) = R_UNDEF
-                    retrievedCloudTopTau(i) = R_UNDEF
-                    retrievedCloudTopSize(i) = R_UNDEF
+                    retrievedCloudTopNd_Q06(i) = R_UNDEF
+                    retrievedCloudTopLWP_Q06(i) = R_UNDEF
+                    retrievedCloudTopTau_Q06(i) = R_UNDEF
+                    retrievedCloudTopSize_Q06(i) = R_UNDEF
                 end if
             end if
         end if
+
+        ! Sampling: ALL method 
+        if (cloudMask(i) & ! cloudy pixel
+           .and. (retrievedPhase(i) == phaseIsLiquid) & ! liquid clouds
+           .and. (retrievedCloudTopTemperature(i) > 268._wp .and. retrievedCloudTopTemperature(i) < 300._wp) & ! 268 K < CTT < 300 K
+            ) then
+
+            if (retrievedCloudTopTemperature(i).eq.R_UNDEF .or. retrievedTau(i).eq.R_UNDEF .or. retrievedSize(i).eq.R_UNDEF) then
+                retrievedCloudTopNd_ALL(i) = R_UNDEF
+                retrievedCloudTopLWP_ALL(i) = R_UNDEF
+                retrievedCloudTopTau_ALL(i) = R_UNDEF
+                retrievedCloudTopSize_ALL(i) = R_UNDEF
+
+            else
+                retrievedCloudTopLWP_ALL(i) = 5._wp/9._wp * 1000._wp * retrievedTau(i) * retrievedSize(i) ! derived LWP from Tau and Re
+                retrievedCloudTopTau_ALL(i) = retrievedTau(i)
+                retrievedCloudTopSize_ALL(i) = retrievedSize(i)
+
+                if (retrievedTau(i) * retrievedSize(i) > 0._wp) then ! ensure the derived LWP larger than zero because size has re_fill value
+
+                    !call calNd_bennartz17(retrievedCloudTopTemperature(i), &
+                    !                      2._wp/3._wp * 1000._wp * retrievedTau(i) * retrievedSize(i), & ! derived LWP from Tau and Re
+                    !                      retrievedTau(i), &
+                    !                      retrievedCloudTopNd(i))
+
+                    call calNd_grosvenor18(retrievedCloudTopTemperature(i), &
+                                          retrievedSize(i), & 
+                                          retrievedTau(i), &
+                                          retrievedCloudTopNd_ALL(i))
+                    !write (*,*) 'calculating Nd...', 'temp=',retrievedCloudTopTemperature(i), 'tau=',retrievedTau(i), 'size=',retrievedSize(i), 'Nd=',retrievedCloudTopNd(i)
+                else
+                    retrievedCloudTopNd_ALL(i) = R_UNDEF
+                    retrievedCloudTopLWP_ALL(i) = R_UNDEF
+                    retrievedCloudTopTau_ALL(i) = R_UNDEF
+                    retrievedCloudTopSize_ALL(i) = R_UNDEF
+                end if
+            end if
+        end if
+
     end do ! i
 
   end subroutine modis_subcolumn
@@ -380,9 +425,7 @@ contains
        Cloud_Top_Nd_Q06_Total_Mean,           Cloud_top_LWP_Q06_Total_Mean,       & ! YQIN 01/18/23
        Cloud_top_Tau_Q06_Total_Mean,          Cloud_Top_Size_Q06_Total_Mean,      & ! YQIN 04/04/23
        Cloud_Top_Nd_ALL_Total_Mean,           Cloud_top_LWP_ALL_Total_Mean,       & ! YQIN 02/29/24
-       Cloud_top_Tau_ALL_Total_Mean,          Cloud_Top_Size_ALL_Total_Mean,                                         & 
-       Cloud_Top_Temperature_Total_Mean,  Cloud_Top_Nd_Total_Mean,           Cloud_top_LWP_Total_Mean,       & ! YQIN 01/18/23
-       Cloud_top_Tau_Total_Mean,          Cloud_Top_Size_Total_Mean,                                & ! YQIN 04/04/23
+       Cloud_top_Tau_ALL_Total_Mean,          Cloud_Top_Size_ALL_Total_Mean,                                         &
        Liquid_Water_Path_Mean,            Ice_Water_Path_Mean,                                               &    
        Optical_Thickness_vs_Cloud_Top_Pressure,Optical_Thickness_vs_ReffIce,Optical_Thickness_vs_ReffLiq,    & 
        Optical_Thickness_vs_Cloud_Top_Pressure_Liq,  & ! YQIN 04/04/23
@@ -462,6 +505,7 @@ contains
          validRetrievalMask, &
          cloudNdMask_Q06, & ! YQIN 01/18/23
          cloudNdMask_ALL  ! YQIN 02/29/24
+
     real(wp),dimension(nPoints,nSubCols) :: &
          tauWRK,ctpWRK,reffIceWRK,reffLiqWRK, &
          tauLiqWRK,tauIceWRK,lwpWRK ! YQIN 04/04/23
