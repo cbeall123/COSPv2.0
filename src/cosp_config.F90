@@ -319,7 +319,7 @@ MODULE MOD_COSP_CONFIG
     ! CLOUDSAT and MODIS joint product information (2018.11.22)
     ! ####################################################################################
     ! @ COSP_DIAG_WARMRAIN:
-    integer, parameter :: CFODD_NCLASS  =    9 ! # of classes for CFODD (classified by MODIS Reff )
+    integer, parameter :: CFODD_NCLASS  =    15 ! # of classes for CFODD (classified by MODIS Reff )
     integer, parameter :: WR_NREGIME    =    11 ! # of warm-rain regimes (1 non-precip/ 2 drizzling/ 3 raining - MODIS, 
                                                 ! 10  - MODIS/CALIPSO, not detected by MODIS/CloudSat
                                                 ! 11  - CALIPSO only

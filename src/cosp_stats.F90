@@ -377,7 +377,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp) :: cbtmh     !! diagnosed in-cloud optical depth
     real(wp), dimension(Ncolumns) :: slwccot_cls !! masking COT by class
     real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls
-    integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2,scolcls3 !! masking by class 
+    integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2,scolcls3,scolcls4,scolcls5 !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
     logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct, ulmodis
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
@@ -786,6 +786,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
             liqreff(i) .gt.  CFODD_BNDRE(4)      ) then
             ulmodis = .true. !! if MODIS does not detect a cloud, check if CALIPSO detects
         endif
+        
+       ! initialize subcolumns mask
+        scolcls4(:,1:Nlevels) = 0 ! for full CFODD
+        scolcls5(:,1:Nlevels) = 0 ! for CFODD with 4 < COT < 20 and max columnd dBZ < 20
 
        !CDIR NOLOOPCHG
        do j = 1, Ncolumns, 1
@@ -857,6 +861,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
               !! retrievals of ICOD and dBZe bin for CFODD plane
               diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
               cbtmh   = zlev(i,kcbtm)
+              cmxdbz  = CFODD_DBZE_MIN  !! initialized
               !CDIR NOLOOPCHG
               do k = kcbtm, kctop, -1
                  if( k .eq. kcbtm ) then
@@ -866,8 +871,37 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                     diagicod = liqcot(i) * ( 1._wp - ( (zlev(i,k)-cbtmh)/diagcgt)**(5._wp/3._wp) )
                  endif
                  icod_cal(i,j,k) = min( diagicod, CFODD_ICOD_MAX )
+                 cmxdbz = max( cmxdbz, dbze(i,j,k) )  !! column maximum dBZe update for CFODDs
               enddo ! k (Nlevels)
-          
+              
+              !! save MODIS-CALIPSO SLWCs binned by Reff
+              icls = 0
+              if ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) ) then
+                 icls = 10
+              elseif ( liqreff(i) .ge. CFODD_BNDRE(2)  .and.  liqreff(i) .lt. CFODD_BNDRE(3)  ) then
+                 icls = 11
+              elseif ( liqreff(i) .ge. CFODD_BNDRE(3) ) then
+                 icls = 12
+              endif
+
+              scolcls4(j, 1:Nlevels) = icls
+
+              !! Also saving MODIS-CALIPSO 4 < COT < 20
+              icls = 0
+              if  ( liqreff(i) .ge. CFODD_BNDRE(1) .and. liqreff(i) .lt. CFODD_BNDRE(2) .and. &
+                  cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp .and. liqcot(i) < 20._wp ) then
+                 icls = 13
+              elseif ( liqreff(i) .ge. CFODD_BNDRE(2) .and. liqreff(i) .lt. CFODD_BNDRE(3) .and. &
+                  cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp .and. liqcot(i) < 20._wp ) then
+                 icls = 14
+              elseif ( liqreff(i) .ge. CFODD_BNDRE(3) .and.  &
+                  cmxdbz .lt. CFODD_DBZE_MAX .and. liqcot(i) .ge. 4._wp .and. liqcot(i) < 20._wp ) then
+                 icls = 15
+              endif
+              
+              scolcls5(j, 1:Nlevels) = icls
+                  
+               
           !If only CALIPSO detected the SLWC, add to npdfslwc_calonly
           elseif (ulmodis) then
               iregime = 11
@@ -889,7 +923,45 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
        
        slwccot_ntotal(i, 1:SLWC_NCOT, icls) = hist1d( Ncolumns,                  &
                       slwccot_cal(i,1:Ncolumns), SLWC_NCOT, SLWC_HISTCOT         )
-      endif   
+      endif 
+
+      !! Generate CFODD for MODIS-CALIPSO SLWCs
+      do cs = 10,12,1
+          !! initialize
+          dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
+          icod_cls = icod_cal(i,1:Ncolumns,1:Nlevels)
+          slwccot_cls = slwccot_cal(i,1:Ncolumns)
+
+          !! mask out subcolumns not in class i
+          where (scolcls4(1:Ncolumns,1:Nlevels) .ne. cs)
+              dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+              icod_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+          end where
+
+          call hist2d( dbze_cls(1:Ncolumns,1:Nlevels), icod_cls(1:Ncolumns,1:Nlevels), &
+                      & Ncolumns*Nlevels,                                          &
+                      & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,  &
+                      & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, cs )      )
+       enddo ! cs (classes)
+
+      !! Generate additional CFODD for MODIS-CALIPSO SLWCs with max dBZ < 20, 4 < COT < 20
+      do cs = 13,15,1
+          !! initialize
+          dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
+          icod_cls = icod_cal(i,1:Ncolumns,1:Nlevels)
+          slwccot_cls = slwccot_cal(i,1:Ncolumns)
+
+          !! mask out subcolumns not in class i
+          where (scolcls5(1:Ncolumns,1:Nlevels) .ne. cs)
+              dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+              icod_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
+          end where
+
+          call hist2d( dbze_cls(1:Ncolumns,1:Nlevels), icod_cls(1:Ncolumns,1:Nlevels), &
+                      & Ncolumns*Nlevels,                                          &
+                      & CFODD_HISTDBZE, CFODD_NDBZE, CFODD_HISTICOD, CFODD_NICOD,  &
+                      & cfodd_ntotal( i, 1:CFODD_NDBZE, 1:CFODD_NICOD, cs )      )
+       enddo ! cs (classes)
     
     enddo     ! i (Npoints)
 
