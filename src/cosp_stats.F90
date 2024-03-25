@@ -698,6 +698,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
           icod_cls = icod(i,1:Ncolumns,1:Nlevels)
           slwccot_cls = slwccot(i,1:Ncolumns)
+
+          !! Apply ground-clutter mask
+          dbze_cls(1:Ncolumns,Nlevels-2:Nlevels) = R_UNDEF
+          icod_cls(1:Ncolumns,Nlevels-2:Nlevels) = R_UNDEF
           
           !! mask out subcolumns not in class i
           where (scolcls2(1:Ncolumns,1:Nlevels) .ne. cs)
@@ -725,7 +729,11 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           dbze_cls = dbze(i,1:Ncolumns,1:Nlevels)
           icod_cls = icod(i,1:Ncolumns,1:Nlevels)
           slwccot_cls = slwccot(i,1:Ncolumns)
-          
+
+          !! Apply ground-clutter mask
+          dbze_cls(1:Ncolumns,Nlevels-2:Nlevels) = R_UNDEF
+          icod_cls(1:Ncolumns,Nlevels-2:Nlevels) = R_UNDEF          
+
           !! mask out subcolumns not in class i
           where (scolcls3(1:Ncolumns,1:Nlevels) .ne. cs)
               dbze_cls(1:Ncolumns,1:Nlevels) = R_UNDEF
