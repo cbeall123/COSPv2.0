@@ -353,12 +353,13 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          lsmallreff,        & ! # of liquid clouds that have too small reff to meet SLWC conditions
          lbigreff,          & ! # of liquid clouds that have too big reff to meet SLWC conditions
          coldct,            & ! # of subcolumns with cloud top temp < 273 K
-         coldct_cal,        & ! # of subcolumns with cloud top temp < 273 K detected by CALIPSO (and not MODIS)
+         coldct_cal,        & ! # of subcolumns with cloud top temp < 273 K detected by CALIPSO and MODIS, not MODIS/CloudSat
          calice,            &  ! # of columns where Calipso detected ice that was not detected by MODIS
          nfracmulti            ! # of subcolumns where fracout indicates multilayer cloud
     real(wp),dimension(Npoints,2),intent(inout) :: &
-         nmultilcld,        & ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO/CloudSat detected
          nhetcld              ! # of heterogenous clouds (stratocumulus above/below cumulus) in continuous layer
+    real(wp),dimension(Npoints,3),intent(inout) :: &
+         nmultilcld           ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO detected, 3= MODIS/CALIPSO detected
      real(wp),dimension(Npoints,NOBSTYPE),intent(inout) :: obs_ntotal     ! # of Observations
      real(wp),dimension(Npoints,SLWC_NCOT,COT_NCLASS),intent(inout) :: slwccot_ntotal ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin
      !real(wp),dimension(Npoints,SLWC_NCOT,3),intent(inout) :: slwccot_ntotal     ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin, MODIS/CALIPSO
@@ -855,6 +856,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !If CALIPSO detected a multilayer cloud that MODIS/CloudSat did not, add to multilcld_cal
           if (multilcld .and. (.not. modiscs_multi(i,j) ) ) then
              nmultilcld(i,2) = nmultilcld(i,2) + 1._wp
+          endif
+          !If CALIPSO and MODIS detected a multilayer lcoud that MODIS/CloudSat did not, add to multilcld_mcal
+          if (multilcld .and. (.not. modiscs_multi(i,j) ) .and. (.not. ulmodis)) then
+             nmultilcld(i,3) = nmultilcld(i,3) + 1._wp
           endif
           
           if ( .not. oslwc ) cycle  !! return to the j (subcolumn) loop
