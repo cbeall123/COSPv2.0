@@ -113,7 +113,7 @@ contains
   ! ########################################################################################
   subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, optical_thickness,       & 
                          tauLiquidFraction, g, w0,isccpCloudTopPressure,                 &
-                         retrievedPhase, retrievedCloudTopPressure,                      &
+                         retrievedPhase, multilcld, retrievedCloudTopPressure,           &
                          retrievedTau,   retrievedSize)
 
     ! INPUTS
@@ -132,7 +132,8 @@ contains
 
     ! OUTPUTS
     integer, dimension(nSubCols), intent(inout) :: &
-         retrievedPhase               ! MODIS retrieved phase (liquid/ice/other)              
+         retrievedPhase,            & ! MODIS retrieved phase (liquid/ice/other)              
+         multilcld                    ! MODIS multilayer cloud flag (1 = multilayer cloud present)
     real(wp),dimension(nSubCols), intent(inout) :: &
          retrievedCloudTopPressure, & ! MODIS retrieved CTP (Pa)
          retrievedTau,              & ! MODIS retrieved optical depth (unitless)              
@@ -141,13 +142,15 @@ contains
     ! LOCAL VARIABLES
     logical, dimension(nSubCols)      :: &
          cloudMask
+    logical                           :: &
+         octop, ocbtm
     real(wp)                          :: &
          integratedLiquidFraction,       &
          obs_Refl_nir
     real(wp),dimension(num_trial_res) :: &
          predicted_Refl_nir
     integer                           :: &
-         i
+         i,j,kcbtm,kctop
 
     ! ########################################################################################
     !                           Optical depth retrieval 
@@ -161,9 +164,36 @@ contains
     ! does optical thickness exceed detection threshold? 
     ! ########################################################################################
     cloudMask = retrievedTau(1:nSubCols) >= min_OpticalThickness
-    
-    do i = 1, nSubCols
+
+    multilcld(:) = INT(0) !! CMB - initialize multilayer cloud flag, 1=multilayer cloud    
+    do i = 1, nSubCols   
        if(cloudMask(i)) then 
+
+          !! CMB - Adding a multilayer cloud flag
+          ocbtm = .true.
+          octop = .true.
+          kcbtm =     0   !! initialize
+          kctop =     0   !! initialize
+          do j = Nlevels, 1, -1 !! scan from lowest level to TOA
+             if ( ocbtm .and. optical_thickness(i,j) .gt. 0._wp ) then
+                ocbtm = .false. !! cloud base detected
+                kcbtm = j
+                kctop = j
+             endif
+             if ( octop .and. .not. ocbtm .and.       &  !! cloud base already detected
+                  optical_thickness(i,j) .gt. 0._wp ) then
+                kctop = j 
+             endif 
+          enddo !! j loop
+
+          !! Is this a multilayer cloud
+          do j = kcbtm, kctop, -1 !! scan from cloud-base to cloud-top
+             if (optical_thickness(i,j) .le. 0._wp) then
+                multilcld(i) = INT(1)
+             endif
+          enddo !! j loop
+
+             
           ! ##################################################################################
           !                       Cloud top pressure determination 
           ! MODIS uses CO2 slicing for clouds with tops above about 700 mb and thermal 
