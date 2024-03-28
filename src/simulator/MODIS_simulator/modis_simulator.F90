@@ -113,7 +113,7 @@ contains
   ! ########################################################################################
   subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, optical_thickness,       & 
                          tauLiquidFraction, g, w0,isccpCloudTopPressure,                 &
-                         retrievedPhase, multilcld, retrievedCloudTopPressure,           &
+                         retrievedPhase, modis_nlayer, retrievedCloudTopPressure,        &
                          retrievedTau,   retrievedSize)
 
     ! INPUTS
@@ -133,7 +133,7 @@ contains
     ! OUTPUTS
     integer, dimension(nSubCols), intent(inout) :: &
          retrievedPhase,            & ! MODIS retrieved phase (liquid/ice/other)              
-         multilcld                    ! MODIS multilayer cloud flag (1 = multilayer cloud present)
+         modis_nlayer                 ! MODIS multilayer cloud flag (number of cloud layers detected)
     real(wp),dimension(nSubCols), intent(inout) :: &
          retrievedCloudTopPressure, & ! MODIS retrieved CTP (Pa)
          retrievedTau,              & ! MODIS retrieved optical depth (unitless)              
@@ -146,7 +146,8 @@ contains
          octop, ocbtm
     real(wp)                          :: &
          integratedLiquidFraction,       &
-         obs_Refl_nir
+         obs_Refl_nir,                   &
+         optical_thickness_sum
     real(wp),dimension(num_trial_res) :: &
          predicted_Refl_nir
     integer                           :: &
@@ -165,7 +166,7 @@ contains
     ! ########################################################################################
     cloudMask = retrievedTau(1:nSubCols) >= min_OpticalThickness
 
-    multilcld(:) = INT(0) !! CMB - initialize multilayer cloud flag, 1=multilayer cloud    
+    modis_nlayer(:) = INT(0) !! CMB - initialize multilayer cloud flag, n = number of cloud layers    
     do i = 1, nSubCols   
        if(cloudMask(i)) then 
 
@@ -187,10 +188,21 @@ contains
           enddo !! j loop
 
           !! Is this a multilayer cloud
+          optical_thickness_sum = 0._wp
           do j = kcbtm, kctop, -1 !! scan from cloud-base to cloud-top
-             if (optical_thickness(i,j) .le. 0._wp) then
-                multilcld(i) = INT(1)
+             !if (optical_thickness(i,j) .le. 0._wp) then
+             !   multilcld(i) = INT(1)
+             !endif
+             if ( optical_thickness(i,j) .ge. 0._wp ) then
+                optical_thickness_sum = optical_thickness_sum + optical_thickness(i,j)
              endif
+
+             if ( optical_thickness(i,j) .le. 0._wp .and. optical_thickness_sum .ge. min_OpticalThickness ) then
+                modis_nlayer(i) = modis_nlayer(i) + INT(1)
+             else if ( optical_thickness(i,j) .le. 0._wp .and. optical_thickness_sum .lt. min_OpticalThickness ) then
+                optical_thickness_sum = 0._wp
+             endif
+
           enddo !! j loop
 
              

@@ -297,6 +297,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                                  lchnk, sunlit,                        & !! in
                                  lwp,     liqcot,   liqreff, liqcfrc,  & !! in
                                  iwp,     icecot,   icereff, icecfrc,  & !! in
+                                 modisMultilCld,                       & !! in
                                  fracout, dbze,                        & !! in
                                  tautot_liq, tautot_ice,               & !! in
                                  lidarcldflag,                         & !! in
@@ -329,6 +330,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          icecot,           & ! MODIS ice COT
          icereff,          & ! MODIS ice Reff [m]
          icecfrc             ! MODIS ice cloud fraction
+    integer, dimension(Npoints,Ncolumns), intent(in) :: &
+         modisMultilCld      ! MODIS subcolumn cloud layer number
     real(wp), dimension(Npoints,Nlevels), intent(in) :: &
          zlev                ! altitude [m] for model level, above ground
     real(wp), dimension(Npoints,1,Nlevels),intent(in) :: &
@@ -358,8 +361,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          nfracmulti            ! # of subcolumns where fracout indicates multilayer cloud
     real(wp),dimension(Npoints,2),intent(inout) :: &
          nhetcld              ! # of heterogenous clouds (stratocumulus above/below cumulus) in continuous layer
-    real(wp),dimension(Npoints,3),intent(inout) :: &
-         nmultilcld           ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO detected, 3= MODIS/CALIPSO detected
+    real(wp),dimension(Npoints,4),intent(inout) :: &
+         nmultilcld           ! # of multilayer cloud subcolumns, excluded from SLWC counts, 1 = MODIS/CloudSat detected, 2 = CALIPSO detected, 3= MODIS/CALIPSO detected, 4 = MODIS detected
      real(wp),dimension(Npoints,NOBSTYPE),intent(inout) :: obs_ntotal     ! # of Observations
      real(wp),dimension(Npoints,SLWC_NCOT,COT_NCLASS),intent(inout) :: slwccot_ntotal ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin
      !real(wp),dimension(Npoints,SLWC_NCOT,3),intent(inout) :: slwccot_ntotal     ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin, MODIS/CALIPSO
@@ -380,7 +383,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls
     integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2,scolcls3,scolcls4,scolcls5 !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
-    logical  :: octop, ocbtm, oslwc, multilcld, hetcld, modis_ice, fracmulti, icoldct, ulmodis
+    logical  :: octop, ocbtm, oslwc, multilcld, multilcld_ocal, multilcld_mcal, hetcld
+    logical  :: modis_ice, fracmulti, icoldct, ulmodis
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
     integer  :: obstype   !! 1 = all-sky; 2 = clear-sky; 3 = cloudy-sky
     real(wp),dimension(Npoints,Ncolumns) :: slwccot     ! MODIS liquid COT for SLWCs only
@@ -844,6 +848,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
           oslwc = .true.
           multilcld = .false.
+          multilcld_ocal = .false.
+          multilcld_mcal = .false.
 
           !CDIR NOLOOPCHG
           do k = kcbtm, kctop, -1
@@ -853,14 +859,23 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              endif
           enddo
 
-          !If CALIPSO detected a multilayer cloud that MODIS/CloudSat did not, add to multilcld_cal
-          if (multilcld .and. (.not. modiscs_multi(i,j) ) ) then
+          !If CALIPSO detected a multilayer cloud that MODIS does not detect, add to multilcld_cal
+          if ( multilcld .and. (.not. modiscs_multi(i,j) ) .and. ulmodis ) then
              nmultilcld(i,2) = nmultilcld(i,2) + 1._wp
+             multilcld_ocal = .true.
           endif
-          !If CALIPSO and MODIS detected a multilayer lcoud that MODIS/CloudSat did not, add to multilcld_mcal
-          if (multilcld .and. (.not. modiscs_multi(i,j) ) .and. (.not. ulmodis)) then
+          !If CALIPSO and MODIS detected a multilayer cloud that MODIS/CloudSat did not, add to multilcld_mcal
+          if ( multilcld .and. (.not. modiscs_multi(i,j) ) .and. (.not. ulmodis) ) then
              nmultilcld(i,3) = nmultilcld(i,3) + 1._wp
+             multilcld_mcal = .true.
           endif
+          !If MODIS detected a multilayer cloud that CALIPSO, MODIS/CloudSat, MODIS/CALIPSO did not, multilcld_mod
+          if ( (modisMultilCld(i,j) .gt. INT(1)) .and. (.not. modiscs_multi(i,j) ) .and. (.not. multilcld) & 
+               .and. (.not. ulmodis) ) then
+             nmultilcld(i,4) = nmultilcld(i,4) + 1._wp
+             oslwc = .false.
+          endif
+
           
           if ( .not. oslwc ) cycle  !! return to the j (subcolumn) loop
 
