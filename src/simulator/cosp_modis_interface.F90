@@ -60,7 +60,8 @@ MODULE MOD_COSP_Modis_INTERFACE
           tau(:,:,:),     & ! Subcolumn optical thickness @ 0.67 microns.
           liqFrac(:,:,:), & ! Liquid water fraction
           g(:,:,:),       & ! Subcolumn assymetry parameter  
-          w0(:,:,:)         ! Subcolumn single-scattering albedo
+          w0(:,:,:),      & ! Subcolumn single-scattering albedo
+          at(:,:)           ! Subcolumn air temperature at levels
   end type modis_IN
 contains
   ! %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -112,9 +112,9 @@ contains
   !       alogrithm in this simulator we simply report the values from the ISCCP simulator. 
   ! ########################################################################################
   subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, optical_thickness,       & 
-                         tauLiquidFraction, g, w0,isccpCloudTopPressure,                 &
+                         tauLiquidFraction, g, w0, atemp, isccpCloudTopPressure,         &
                          retrievedPhase, modis_nlayer, retrievedCloudTopPressure,        &
-                         retrievedTau,   retrievedSize)
+                         retrievedTau,   retrievedSize, modis_sctt)
 
     ! INPUTS
     integer,intent(in) :: &
@@ -129,6 +129,8 @@ contains
          w0                           ! Subcolumn single-scattering albedo 
     real(wp),dimension(nSubCols),intent(in) :: &
          isccpCloudTopPressure        ! ISCCP retrieved cloud top pressure (Pa)
+    real(wp),dimension(nLevels),intent(in) ::  & 
+         atemp                        ! cospgridIN%at (K)
 
     ! OUTPUTS
     integer, dimension(nSubCols), intent(inout) :: &
@@ -137,7 +139,8 @@ contains
     real(wp),dimension(nSubCols), intent(inout) :: &
          retrievedCloudTopPressure, & ! MODIS retrieved CTP (Pa)
          retrievedTau,              & ! MODIS retrieved optical depth (unitless)              
-         retrievedSize                ! MODIS retrieved particle size (microns)              
+         retrievedSize,             & ! MODIS retrieved particle size (microns)              
+         modis_sctt                   ! MODIS cloud top temperature for WRDs (K)
 
     ! LOCAL VARIABLES
     logical, dimension(nSubCols)      :: &
@@ -186,6 +189,9 @@ contains
                 kctop = j 
              endif 
           enddo !! j loop
+          
+          !! Save temperature at cloud top for WRDs
+          modis_sctt(i) = atemp(kctop)
 
           !! Is this a multilayer cloud
           optical_thickness_sum = 0._wp

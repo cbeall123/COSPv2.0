@@ -297,7 +297,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                                  lchnk, sunlit,                        & !! in
                                  lwp,     liqcot,   liqreff, liqcfrc,  & !! in
                                  iwp,     icecot,   icereff, icecfrc,  & !! in
-                                 modisMultilCld,                       & !! in
+                                 modis_ctt, modisMultilCld,            & !! in
                                  fracout, dbze,                        & !! in
                                  tautot_liq, tautot_ice,               & !! in
                                  lidarcldflag,                         & !! in
@@ -332,6 +332,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          icecfrc             ! MODIS ice cloud fraction
     integer, dimension(Npoints,Ncolumns), intent(in) :: &
          modisMultilCld      ! MODIS subcolumn cloud layer number
+    real(wp), dimension(Npoints,Ncolumns), intent(in) :: &
+         modis_ctt           ! MODIS subcolumn cloud top temperature (K)
     real(wp), dimension(Npoints,Nlevels), intent(in) :: &
          zlev                ! altitude [m] for model level, above ground
     real(wp), dimension(Npoints,1,Nlevels),intent(in) :: &
@@ -383,8 +385,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     real(wp), dimension(Ncolumns,Nlevels) :: dbze_cls, icod_cls
     integer,  dimension(Ncolumns,Nlevels) :: scolcls, scolcls2,scolcls3,scolcls4,scolcls5 !! masking by class 
     real(wp), dimension(Npoints,Ncolumns,Nlevels) :: icod, icod_cal  !! in-cloud optical depth (ICOD)
-    logical  :: octop, ocbtm, oslwc, multilcld, multilcld_ocal, multilcld_mcal, hetcld
-    logical  :: modis_ice, fracmulti, icoldct, ulmodis
+    logical  :: octop, ocbtm, oslwc, multilcld, multilcld_ocal, multilcld_mcal, multilcld_mod,hetcld
+    logical  :: modis_ice, fracmulti, icoldct, ulmodis, slwc_mcal, slwc_ocal
     integer, dimension(Npoints,Ncolumns,Nlevels) :: fracout_int  !! fracout (decimal to integer)
     integer  :: obstype   !! 1 = all-sky; 2 = clear-sky; 3 = cloudy-sky
     real(wp),dimension(Npoints,Ncolumns) :: slwccot     ! MODIS liquid COT for SLWCs only
@@ -836,24 +838,28 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              endif
           enddo  !! k loop         
 
-          if( ocbtm )  cycle  !! cloud wasn't detected in this subcolumn
+          if( ocbtm .and. modisMultilCld(i,j) .lt. INT(1))  cycle  !! cloud wasn't detected in this subcolumn
           !! check SLWC?
           !! If cold cloud top and not detected already by MODIS/CloudSat, add to coldct_cal
           !! Supercooled liquid cloud fraction requires phase detection, which is only available through
           !! MODIS, so MODIS detection of cloud is required for the supercooled liquid frequency here
-          if( temp(i,1,kctop) .lt. tmelt .and. .not. modiscs_coldct(i,j) .and. .not. ulmodis) then 
+          if( temp(i,1,kctop) .lt. tmelt .and. .not. modiscs_coldct(i,j) .and. .not. ulmodis &
+               .and. .not. ocbtm ) then 
               coldct_cal(i) = coldct_cal(i) + 1._wp 
           endif
 
-          if( temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
+          if( .not. ocbtm .and. temp(i,1,kctop) .lt. tmelt ) cycle  !! return to the j (subcolumn) loop
           oslwc = .true.
           multilcld = .false.
           multilcld_ocal = .false.
           multilcld_mcal = .false.
+          multilcld_mod = .false.
+          slwc_mcal = .false.
+          slwc_ocal = .false.
 
           !CDIR NOLOOPCHG
           do k = kcbtm, kctop, -1
-             if ( lidarcldflag(i,j,k) .ne. 1._wp ) then
+             if ( .not. ocbtm .and. lidarcldflag(i,j,k) .ne. 1._wp ) then
                 multilcld = .true.
                 oslwc = .false.
              endif
@@ -870,10 +876,13 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              multilcld_mcal = .true.
           endif
           !If MODIS detected a multilayer cloud that CALIPSO, MODIS/CloudSat, MODIS/CALIPSO did not, multilcld_mod
-          if ( (modisMultilCld(i,j) .gt. INT(1)) .and. (.not. modiscs_multi(i,j) ) .and. (.not. multilcld) & 
-               .and. (.not. ulmodis) ) then
+          !Need to add a MODIS cloud top temperature condition
+          if ( ocbtm .and. (modisMultilCld(i,j) .gt. INT(1)) .and. (.not. modiscs_multi(i,j) ) &
+               .and. (.not. multilcld) & 
+               .and. (.not. ulmodis) .and. modis_ctt(i,j) .ge. tmelt ) then
              nmultilcld(i,4) = nmultilcld(i,4) + 1._wp
-             oslwc = .false.
+             multilcld_mod = .true.
+             !oslwc = .false. !Only applying MODIS nlayer mask to MODIS or CALIPSO SLWC and multilayer cloud fraction
           endif
 
           
@@ -882,9 +891,10 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! warm-rain occurrence frequency
           !! If MODIS/CALIPSO detected the SLWC, add to npdfslwc_mcal
           !! and retrieve COT binned by cloud top Reff
-          if (.not. ulmodis) then 
+          if (.not. ocbtm .and. .not. ulmodis) then 
               iregime = 10
               wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+              slwc_mcal = .true.
 
               !! retrievals of ICOD and dBZe bin for CFODD plane
               diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
@@ -931,10 +941,21 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                   
                
           !If only CALIPSO detected the SLWC, add to npdfslwc_calonly
-          elseif (ulmodis) then
+          elseif (ulmodis .and. .not. ocbtm) then
               iregime = 11
               wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+              slwc_ocal = .true.
+          !If only MODIS detected the SLWC, add to npdfslwc_modonly
+          elseif (ocbtm .and. .not. ulmodis .and. modisMultilCld(i,j) .eq. INT(1) &
+               .and. modis_ctt(i,j) .gt. tmelt &
+               .and. .not. slwc_mcal .and. .not. slwc_ocal  ) then 
+             iregime = 12
+             wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+
           endif
+
+
+          
 
        enddo  ! j (Ncolumns)
        
