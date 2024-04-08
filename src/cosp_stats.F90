@@ -844,7 +844,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
           !! Supercooled liquid cloud fraction requires phase detection, which is only available through
           !! MODIS, so MODIS detection of cloud is required for the supercooled liquid frequency here
           if( temp(i,1,kctop) .lt. tmelt .and. .not. modiscs_coldct(i,j) .and. .not. ulmodis &
-               .and. .not. ocbtm ) then 
+               .and. .not. ocbtm .and. .not. modis_ice) then 
               coldct_cal(i) = coldct_cal(i) + 1._wp 
           endif
 
