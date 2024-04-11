@@ -128,11 +128,6 @@ contains
                          retrievedCloudTopTau_ALL, retrievedCloudTopSize_ALL, & ! YQIN 03/04/23 added
                          retrievedTau,   retrievedSize, &
                          modis_sctt )
-                         retrievedCloudTopNd, & ! YQIN 01/18/23 added
-                         retrievedCloudTopLWP, & ! YQIN 01/26/23 added
-                         retrievedCloudTopTau, retrievedCloudTopSize, & ! YQIN 03/04/23 added
-                         retrievedTau,   retrievedSize)
-
     ! INPUTS
     integer,intent(in) :: &
          nSubCols,                  & ! Number of subcolumns
