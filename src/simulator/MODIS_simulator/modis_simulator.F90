@@ -116,9 +116,9 @@ contains
   subroutine modis_subcolumn(nSubCols, nLevels, pressureLevels, &
                          temperature,             & ! YQIN 01/18/23 added
                          optical_thickness,       & 
-                         tauLiquidFraction, g, w0,isccpCloudTopPressure,                 &
+                         tauLiquidFraction, g, w0,atemp,isccpCloudTopPressure,           &
                          isccpCloudTopTemperature, & ! YQIN 01/18/23 added
-                         retrievedPhase, retrievedCloudTopPressure,                      &
+                         retrievedPhase, modis_nlayer, retrievedCloudTopPressure,        &
                          retrievedCloudTopTemperature, & ! YQIN 01/18/23 added
                          retrievedCloudTopNd_Q06, & ! YQIN 01/18/23 added
                          retrievedCloudTopLWP_Q06, & ! YQIN 01/26/23 added
