@@ -307,7 +307,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
                                  lbigreff, nmultilcld, nfracmulti,     & !! inout
                                  nhetcld, coldct,                      & !! inout
                                  coldct_cal,calice, obs_ntotal,        & !! inout
-                                 slwccot_ntotal )    !! inout
+                                 slwccot_ntotal, slwc_comp_flag )    !! inout
     integer,parameter :: &
          Nphase = 6 ! Number of CALIPSO cloud layer phase types
                     ! [ice,liquid,undefined,false ice,false liquid,Percent of ice]
@@ -331,7 +331,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
          icereff,          & ! MODIS ice Reff [m]
          icecfrc             ! MODIS ice cloud fraction
     integer, dimension(Npoints,Ncolumns), intent(in) :: &
-         modisMultilCld      ! MODIS subcolumn cloud layer number
+         modisMultilCld      ! MODIS subcolumn cloud layer numbee
     real(wp), dimension(Npoints,Ncolumns), intent(in) :: &
          modis_ctt           ! MODIS subcolumn cloud top temperature (K)
     real(wp), dimension(Npoints,Nlevels), intent(in) :: &
@@ -368,6 +368,8 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
      real(wp),dimension(Npoints,NOBSTYPE),intent(inout) :: obs_ntotal     ! # of Observations
      real(wp),dimension(Npoints,SLWC_NCOT,COT_NCLASS),intent(inout) :: slwccot_ntotal ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin
      !real(wp),dimension(Npoints,SLWC_NCOT,3),intent(inout) :: slwccot_ntotal     ! # of MODIS liquid COT samples for SLWCs only @ each ICOD bin, MODIS/CALIPSO
+     integer,dimension(Npoints,Ncolumns),intent(inout) :: &
+          slwc_comp_flag      ! Flag for SLWC composition type (1 = MODIS and CloudSat, 2 = MODIS and CALIPSO, 3 = MODIS or CALIPSO)
 
 
     ! Local variables
@@ -407,6 +409,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
     icod_cal(:,:,:) = R_UNDEF
     modiscs_multi(:,:) = .false.
     modiscs_coldct(:,:) = .false.
+    slwc_comp_flag(:,:) = 0
     do i = 1, Npoints
 !       if ( lwp(i) .eq. R_UNDEF ) then  ! for non-sunlit columns
        if ( sunlit(i) .le. 0 ) then  ! for non-sunlit columns
@@ -601,6 +604,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
               iregime = 9
           endif
           wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+          slwc_comp_flag(i,j) = 1
 
           !! retrievals of ICOD and dBZe bin for CFODD plane
           diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
@@ -838,11 +842,17 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
              endif
           enddo  !! k loop         
 
-          if( ocbtm .and. modisMultilCld(i,j) .lt. INT(1))  cycle  !! cloud wasn't detected in this subcolumn
+          if( ocbtm .or. modisMultilCld(i,j) .lt. INT(1))  cycle  !! cloud wasn't detected in this subcolumn
           !! check SLWC?
           !! If cold cloud top and not detected already by MODIS/CloudSat, add to coldct_cal
           !! Supercooled liquid cloud fraction requires phase detection, which is only available through
           !! MODIS, so MODIS detection of cloud is required for the supercooled liquid frequency here
+          if (kctop .eq. 0) then
+             print*,"ocbtm: ", ocbtm
+             print*, "kcbtm: ", kcbtm
+             print*, "modisMultilCld(i,j): ", modisMultilCld(i,j)
+             !print*, "lidarcldflag(i,j,k): ", lidarcldflag(i,j,k)
+          endif
           if( temp(i,1,kctop) .lt. tmelt .and. .not. modiscs_coldct(i,j) .and. .not. ulmodis &
                .and. .not. ocbtm .and. .not. modis_ice) then 
               coldct_cal(i) = coldct_cal(i) + 1._wp 
@@ -895,6 +905,7 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
               iregime = 10
               wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
               slwc_mcal = .true.
+              slwc_comp_flag(i,j) = 2
 
               !! retrievals of ICOD and dBZe bin for CFODD plane
               diagcgt = zlev(i,kctop) - zlev(i,kcbtm)
@@ -945,12 +956,14 @@ END SUBROUTINE COSP_CHANGE_VERTICAL_GRID
               iregime = 11
               wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
               slwc_ocal = .true.
+              slwc_comp_flag(i,j) = 3
           !If only MODIS detected the SLWC, add to npdfslwc_modonly
           elseif (ocbtm .and. .not. ulmodis .and. modisMultilCld(i,j) .eq. INT(1) &
                .and. modis_ctt(i,j) .gt. tmelt &
                .and. .not. slwc_mcal .and. .not. slwc_ocal  ) then 
              iregime = 12
              wr_occfreq_ntotal(i,iregime) = wr_occfreq_ntotal(i,iregime) + 1._wp
+             slwc_comp_flag(i,j) = 3
 
           endif
 

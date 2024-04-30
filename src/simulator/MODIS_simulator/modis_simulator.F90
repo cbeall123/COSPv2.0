@@ -413,7 +413,8 @@ contains
        cloud_top_Tau_Q06, cloud_top_Size_Q06, & ! YQIN 04/03/23
        cloud_top_Nd_ALL, cloud_top_LWP_ALL, & ! YQIN 02/29/24
        cloud_top_Tau_ALL, cloud_top_Size_ALL, & ! YQIN
-       optical_thickness, particle_size,     &
+       optical_thickness, particle_size,     & 
+       slwc_comp_flag,                       & ! CMB 4/19/24
        Cloud_Fraction_Total_Mean,         Cloud_Fraction_Water_Mean,         Cloud_Fraction_Ice_Mean,        &
        Cloud_Fraction_Nd_Q06_Mean,  & ! YQIN 01/18/23
        Cloud_Fraction_Nd_ALL_Mean,  & ! YQIN 02/29/24
@@ -431,12 +432,15 @@ contains
        Optical_Thickness_vs_Cloud_Top_Pressure_Liq,  & ! YQIN 04/04/23
        Optical_Thickness_vs_Cloud_Top_Pressure_Ice,  &
        LWP_vs_ReffLiq, &  
+       LWP_vs_ReffLiq_MaCST, LWP_vs_ReffLiq_MaCAL, LWP_vs_ReffLiq_MoCAL, & ! CMB 04/19/24
        modis_CloudMask, modis_iceCloudMask )
     
     ! INPUTS
     integer,intent(in) :: &
          nPoints,                           & ! Number of horizontal gridpoints
          nSubCols                             ! Number of subcolumns
+    integer,intent(in),dimension(nPoints, nSubcols) :: &  ! CMB 04/19/24
+         slwc_comp_flag
     integer,intent(in), dimension(nPoints, nSubCols) ::  &
          phase                             
     real(wp),intent(in),dimension(nPoints, nSubCols) ::  &
@@ -485,7 +489,10 @@ contains
          Optical_Thickness_vs_Cloud_Top_Pressure_Ice 
     ! YQIN 04/04/23
     real(wp),intent(inout),dimension(nPoints,numMODISLWPBins,numMODISReffLiqBins) :: &    
-         LWP_vs_ReffLiq
+         LWP_vs_ReffLiq, &
+         LWP_vs_ReffLiq_MaCST, & ! CMB 04/19/24
+         LWP_vs_ReffLiq_MaCAL, &
+         LWP_vs_ReffLiq_MoCAL
 
     real(wp),intent(inout),dimension(nPoints,numMODISTauBins,numMODISReffIceBins) :: &    
          Optical_Thickness_vs_ReffIce
@@ -508,7 +515,11 @@ contains
 
     real(wp),dimension(nPoints,nSubCols) :: &
          tauWRK,ctpWRK,reffIceWRK,reffLiqWRK, &
-         tauLiqWRK,tauIceWRK,lwpWRK ! YQIN 04/04/23
+         tauLiqWRK,tauIceWRK,lwpWRK, & ! YQIN 04/04/23
+         lwpWRK_MaCST,lwpWRK_MaCAL, lwpWRK_MoCAL, & ! CMB 04/19/24
+         reffLiqWRK_MaCST,reffLiqWRK_MaCAL, &       ! CMB 04/19/24
+         reffLiqWRK_MoCAL                           ! CMB 04/19/24
+
 
     ! ########################################################################################
     ! Include only those pixels with successful retrievals in the statistics 
@@ -663,6 +674,30 @@ contains
     tauIceWRK(1:nPoints,1:nSubCols) = merge(optical_thickness,R_UNDEF,iceCloudMask)
     lwpWRK(1:nPoints,1:nSubCols)    = merge(LWP_conversion*particle_size*optical_thickness,R_UNDEF,waterCloudMask)
 
+    ! CMB 04/19/24
+    ! initialize
+    lwpWRK_MaCST(1:nPoints,1:nSubCols) = R_UNDEF
+    lwpWRK_MaCAL(1:nPoints,1:nSubCols) = R_UNDEF
+    lwpWRK_MoCAL(1:nPoints,1:nSubCols) = R_UNDEF
+    reffLiqWRK_MaCST(1:nPoints,1:nSubCols) = R_UNDEF
+    reffLiqWRK_MaCAL(1:nPoints,1:nSubCols) = R_UNDEF
+    reffLiqWRK_MoCAL(1:nPoints,1:nSubCols) = R_UNDEF
+
+    where( slwc_comp_flag(1:nPoints,1:nSubCols) .eq. 1 )
+       lwpWRK_MaCST(1:nPoints,1:nSubCols) = LWP_conversion*particle_size*optical_thickness
+       reffLiqWRK_MaCST(1:nPoints,1:nSubCols) = particle_size
+    endwhere
+
+    where (slwc_comp_flag .eq. 2 .OR. slwc_comp_flag .eq. 1 )
+       lwpWRK_MaCAL(1:nPoints,1:nSubCols) = LWP_conversion*particle_size*optical_thickness
+       reffLiqWRK_MaCAL(1:nPoints,1:nSubCols) = particle_size
+    endwhere
+
+    where( slwc_comp_flag .eq. 3 .OR. slwc_comp_flag .eq. 2 .OR. slwc_comp_flag .eq. 1 )
+       lwpWRK_MoCAL(1:nPoints,1:nSubCols) = LWP_conversion*particle_size*optical_thickness
+       reffLiqWRK_MoCAL(1:nPoints,1:nSubCols) = particle_size
+    endwhere
+
     do j=1,nPoints
 
        ! Fill clear and optically thin subcolumns with fill
@@ -673,6 +708,10 @@ contains
           tauLiqWRK(j,1:nSubCols) = -999._wp
           tauIceWRK(j,1:nSubCols) = -999._wp
           lwpWRK(j,1:nSubCols)    = -999._wp
+          ! CMB 04/19/24
+          lwpWRK_MaCST(j, 1:nSubCols) = -999._wp
+          lwpWRK_MaCAL(j,1:nSubCols) = -999._wp
+          lwpWRK_MoCAL(j,1:nSubCols) = -999._wp
 
        endwhere
        ! Joint histogram of tau/CTP
@@ -696,6 +735,18 @@ contains
        call hist2D(lwpWRK(j,1:nSubCols),reffLiqWRK(j,1:nSubCols),nSubCols,               &
                    modis_histLWP,numMODISLWPBins,modis_histReffLiq,         &
                    numMODISReffLiqBins, LWP_vs_ReffLiq(j,1:numMODISLWPBins,1:numMODISReffLiqBins))                   
+
+       ! CMB 04/19/24
+       ! Joint histogram of LWP/ReffLiq for MODIS/CloudSat, MODIS/CALIPSO, MODIS or CALIPSO
+       call hist2D(lwpWRK_MaCST(j,1:nSubCols),reffLiqWRK_MaCST(j,1:nSubCols),nSubCols,               &
+                   modis_histLWP,numMODISLWPBins,modis_histReffLiq,         &
+                   numMODISReffLiqBins, LWP_vs_ReffLiq_MaCST(j,1:numMODISLWPBins,1:numMODISReffLiqBins))
+       call hist2D(lwpWRK_MaCAL(j,1:nSubCols),reffLiqWRK_MaCAL(j,1:nSubCols),nSubCols,               &
+                   modis_histLWP,numMODISLWPBins,modis_histReffLiq,         &
+                   numMODISReffLiqBins, LWP_vs_ReffLiq_MaCAL(j,1:numMODISLWPBins,1:numMODISReffLiqBins))
+       call hist2D(lwpWRK_MoCAL(j,1:nSubCols),reffLiqWRK_MoCAL(j,1:nSubCols),nSubCols,               &
+                   modis_histLWP,numMODISLWPBins,modis_histReffLiq,         &
+                   numMODISReffLiqBins, LWP_vs_ReffLiq_MoCAL(j,1:numMODISLWPBins,1:numMODISReffLiqBins))
        ! -- end 
 
        ! Joint histogram of tau/ReffICE
@@ -723,6 +774,14 @@ contains
     LWP_vs_ReffLiq(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins) = &
          LWP_vs_ReffLiq(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins)/nSubCols 
 
+    ! CMB 04/19/24
+    LWP_vs_ReffLiq_MaCST(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins) = &
+         LWP_vs_ReffLiq_MaCST(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins)/nSubCols
+    LWP_vs_ReffLiq_MaCAL(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins) = &
+         LWP_vs_ReffLiq_MaCAL(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins)/nSubCols
+    LWP_vs_ReffLiq_MoCAL(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins) = &
+         LWP_vs_ReffLiq_MoCAL(1:nPoints,1:numMODISLWPBins,1:numMODISReffLiqBins)/nSubCols
+
 
     ! Unit conversion
     where(Optical_Thickness_vs_Cloud_Top_Pressure /= R_UNDEF) &
@@ -734,6 +793,11 @@ contains
     where(Optical_Thickness_vs_Cloud_Top_Pressure_Ice /= R_UNDEF) &
       Optical_Thickness_vs_Cloud_Top_Pressure_Ice = Optical_Thickness_vs_Cloud_Top_Pressure_Ice*100._wp
     where(LWP_vs_ReffLiq /= R_UNDEF) LWP_vs_ReffLiq = LWP_vs_ReffLiq*100._wp
+
+    ! CMB 04/19/24
+    where(LWP_vs_ReffLiq_MaCST /= R_UNDEF) LWP_vs_ReffLiq_MaCST = LWP_vs_ReffLiq_MaCST*100._wp
+    where(LWP_vs_ReffLiq_MaCAL /= R_UNDEF) LWP_vs_ReffLiq_MaCAL = LWP_vs_ReffLiq_MaCAL*100._wp
+    where(LWP_vs_ReffLiq_MoCAL /= R_UNDEF) LWP_vs_ReffLiq_MoCAL = LWP_vs_ReffLiq_MoCAL*100._wp
 
     where(Optical_Thickness_vs_ReffIce /= R_UNDEF) Optical_Thickness_vs_ReffIce = Optical_Thickness_vs_ReffIce*100._wp
     where(Optical_Thickness_vs_ReffLiq /= R_UNDEF) Optical_Thickness_vs_ReffLiq = Optical_Thickness_vs_ReffLiq*100._wp
